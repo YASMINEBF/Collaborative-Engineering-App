@@ -1,0 +1,83 @@
+/* Shared base for all nodes */
+.node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 600;
+  color: black;
+  transition: all 0.2s ease;
+}
+
+/* ===== Equipment ===== */
+
+.node-equipment {
+  padding: 12px 16px;
+  border-radius: 8px;
+  min-width: 120px;
+  font-size: 14px;
+  background-color: #ffffff;
+}
+
+/* ===== Port ===== */
+
+.node-port {
+  padding: 10px 14px;
+  border-radius: 50%;
+  min-width: 45px;
+  min-height: 45px;
+  font-size: 12px;
+  background-color: #ffffff;
+}
+
+/* Shadow variants */
+.node-shadow {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.node-shadow-selected {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Handles */
+.node-handle {
+  width: 10px;
+  height: 10px;
+  background: #555;
+  border: 2px solid white;
+  position: absolute;
+
+}
+
+/* Floating label (lock / collaborator) */
+.node-indicator {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+/* Push handles OUTSIDE the node */
+
+.react-flow__handle-left {
+  left: -8px;
+}
+
+.react-flow__handle-right {
+  right: -8px;
+}
+
+.react-flow__handle-top {
+  top: -8px;
+}
+
+.react-flow__handle-bottom {
+  bottom: -8px;
+}

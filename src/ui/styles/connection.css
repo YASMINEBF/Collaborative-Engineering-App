@@ -1,0 +1,86 @@
+.connection-menu-container {
+  position: absolute;
+  z-index: 10000;
+  transform: translate(8px, -8px); /* slight offset so it doesn't cover node */
+}
+
+.connection-menu {
+  background: white;
+  padding: 12px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  border: 1px solid #e0e0e0;
+  min-width: 160px;
+}
+
+.connection-menu-title {
+  margin-bottom: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #333;
+  text-align: center;
+}
+
+.connection-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.connection-menu-btn {
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: white;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* close button */
+.connection-menu-close {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #dc3545;
+  border: 2px solid white;
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+}
+
+/* Type colors */
+.connection-menu-btn.haspart {
+  border: 1px solid #4caf50;
+  color: #4caf50;
+}
+.connection-menu-btn.controls {
+  border: 1px solid #2196f3;
+  color: #2196f3;
+}
+.connection-menu-btn.feeds {
+  border: 1px solid #ff9800;
+  color: #ff9800;
+}
+
+.connection-menu-btn.haspart:hover {
+  background: #4caf50;
+  color: white;
+}
+.connection-menu-btn.controls:hover {
+  background: #2196f3;
+  color: white;
+}
+.connection-menu-btn.feeds:hover {
+  background: #ff9800;
+  color: white;
+}

@@ -1,0 +1,79 @@
+/* Modal overlay (dark background) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Modal container */
+.modal {
+  width: 420px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Title */
+.modal-title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Input */
+.modal-input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.modal-input:focus {
+  border-color: #1976d2;
+}
+
+/* Buttons row */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* Buttons */
+.modal-button {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.modal-button.cancel {
+  background: transparent;
+  border: 1px solid #bbb;
+  color: #333;
+}
+
+.modal-button.confirm {
+  background: #1976d2;
+  border: none;
+  color: white;
+}
+
+.modal-button.confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.modal-error {
+  margin-top: 8px;
+  color: #d32f2f;
+  font-size: 12px;
+}

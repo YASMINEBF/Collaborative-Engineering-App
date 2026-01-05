@@ -1,0 +1,93 @@
+// collabs/model/CEngineeringGraph.ts
+import * as collabs from "@collabs/collabs";
+
+import type { ComponentType } from "./ComponentTypes";
+import  CEquipment from "./CEquipment";
+import CPort from "./CPort";
+
+import CRelationship from "../CRelationship";
+import CConflict from "./CConflict";
+import { ConflictKind } from "./enums/ConflictEnum";
+
+import type { RelationshipKind } from "../../models/relationships/enums/RelationshipTypes";
+import { Medium } from "../../models/attributes/enums/Medium";
+import { PortType } from "../../models/attributes/enums/PortType";
+
+// IDs
+export type ComponentId = string;
+export type RelId = string;
+export type ConflictId = string;
+
+// Union of all concrete component types stored in the map
+export type AnyComponent = CEquipment | CPort;
+
+// create entries using map.set(key, ...args)
+export type ComponentSetArgs = [type: ComponentType, uniqueName: string];
+export type RelationshipSetArgs = [
+  type: string,
+  kind: RelationshipKind,
+  sourceId: string,
+  targetId: string,
+  medium: Medium | null
+];
+export type ConflictSetArgs = [kind: ConflictKind];
+
+export class CEngineeringGraph extends collabs.CObject {
+  // Root collections
+  readonly components: collabs.CMap<ComponentId, AnyComponent, ComponentSetArgs>;
+  readonly relationships: collabs.CMap<RelId, CRelationship, RelationshipSetArgs>;
+  readonly conflicts: collabs.CMap<ConflictId, CConflict, ConflictSetArgs>;
+
+  // Root indices
+  readonly nameIndex: collabs.CValueMap<string, ComponentId>;
+  readonly feedsByPortMedium: collabs.CValueMap<string, RelId>;
+
+  constructor(init: collabs.InitToken) {
+    super(init);
+
+    this.components = this.registerCollab("components", (i) =>
+      new collabs.CMap<ComponentId, AnyComponent, ComponentSetArgs>(
+        i,
+        (valueInit, id, type, uniqueName) => {
+          switch (type) {
+            case "equipment":
+              return new CEquipment(valueInit, id, uniqueName);
+
+            case "port":
+              // Provide defaults for the extra args expected by CPort.
+              return new CPort(valueInit, id, 0, Medium.Water, uniqueName, PortType.Input);
+
+            default: {
+              // Compile-time exhaustiveness + runtime safety if old/corrupt data appears
+              const _exhaustive: never = type;
+              throw new Error(`Unknown component type: ${String(_exhaustive)}`);
+            }
+          }
+        }
+      )
+    );
+
+    this.relationships = this.registerCollab("relationships", (i) =>
+      new collabs.CMap<RelId, CRelationship, RelationshipSetArgs>(
+        i,
+        (valueInit, id, type, kind, sourceId, targetId, medium) => {
+          const rel = new CRelationship(valueInit, id, type, kind, sourceId, targetId);
+          rel.medium.value = medium;
+          return rel;
+        }
+      )
+    );
+
+    this.conflicts = this.registerCollab("conflicts", (i) =>
+      new collabs.CMap<ConflictId, CConflict, ConflictSetArgs>(
+        i,
+        (valueInit, _id, kind) => new CConflict(valueInit, kind)
+      )
+    );
+
+    this.nameIndex = this.registerCollab("nameIndex", (i) => new collabs.CValueMap<string, ComponentId>(i));
+    this.feedsByPortMedium = this.registerCollab("feedsByPortMedium", (i) => new collabs.CValueMap<string, RelId>(i));
+  }
+}
+
+export default CEngineeringGraph;
