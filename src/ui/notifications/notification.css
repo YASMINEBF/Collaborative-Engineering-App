@@ -1,0 +1,33 @@
+.ce-notification-center {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+}
+
+.ce-notification {
+  min-width: 220px;
+  max-width: 320px;
+  background: rgba(32, 33, 36, 0.95);
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  font-size: 13px;
+}
+.ce-notification-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.ce-notification-message {
+  opacity: 0.95;
+  word-break: break-word;
+}
+
+/* Light mode adjustments */
+@media (prefers-color-scheme: light) {
+  .ce-notification { background: #fff; color: #222; }
+}

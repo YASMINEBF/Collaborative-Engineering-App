@@ -5,6 +5,7 @@ import { CollabProvider } from "./collabs/provider/CollabProvider";
 //import CollabStatus from "./collabs/provider/CollabStatus";
 
 import Editor from "./ui/Editor";
+import NotificationCenter from "./ui/notifications/NotificationCenter";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <div style={{ marginTop: 12 }}>
           <Editor />
         </div>
+        <NotificationCenter />
       </div>
     </CollabProvider>
   );

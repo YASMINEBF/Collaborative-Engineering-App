@@ -1,6 +1,7 @@
 // src/collabs/provider/CollabProvider.tsx
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createLocalDoc } from "./docSetup";
+import startConflictResolver from "../semantics/conflictResolver";
 
 export type CollabStatus = "loading" | "ready" | "error";
 
@@ -17,6 +18,7 @@ export type CollabContextType = {
   } | null;
   // Network connection state
   isConnected?: boolean;
+  userId?: string;
 };
 
 const CollabContext = createContext<CollabContextType>({
@@ -36,6 +38,7 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
     graph: null,
     provider: null,
     isConnected: false,
+    userId: undefined,
   });
 
   const networkRef = useRef<any>(null);
@@ -43,6 +46,7 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
 
   useEffect(() => {
     let cancelled = false;
+      const resolverRef = { stop: undefined as undefined | (() => void) };
 
     createLocalDoc()
       .then((setup) => {
@@ -72,13 +76,40 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
           network: networkRef.current,
         };
 
+        // Determine a persistent local user id (stored in localStorage if available).
+        let localUserId: string | undefined;
+        try {
+          const key = "ce_localUserId";
+          localUserId = localStorage.getItem(key) ?? undefined;
+          if (!localUserId) {
+            localUserId = `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            localStorage.setItem(key, localUserId);
+          }
+        } catch (e) {
+          localUserId = `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        }
+
         setState({
           status: "ready",
           doc: setup.doc,
           graph: setup.graph,
           provider: providerObj,
           isConnected: connectedRef.current,
+          userId: localUserId,
         });
+
+        // Start a separate conflict resolver service which debounces and defers
+        // calls to `resolveUniqueNames`. This keeps the provider lightweight and
+        // makes the resolver easier to test / replace.
+        try {
+          const resolver = startConflictResolver(setup.doc, setup.graph, localUserId, {
+            debounceMs: 200,
+            initialDelayMs: 250,
+          });
+          resolverRef.stop = resolver.stop;
+        } catch (e) {
+          // ignore if unable to start resolver
+        }
       })
       .catch((e) => {
         if (cancelled) return;
@@ -90,6 +121,9 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
       cancelled = true;
       try {
         networkRef.current?.disconnect?.();
+      } catch {}
+      try {
+        resolverRef.stop?.();
       } catch {}
       networkRef.current = null;
       connectedRef.current = false;

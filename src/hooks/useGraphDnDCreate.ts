@@ -11,7 +11,7 @@ type PaletteType = "equipment" | "port";
 type PendingDrop = { type: PaletteType; position: { x: number; y: number } };
 
 export function useGraphDnDCreate() {
-  const { graph, status } = useCollab();
+  const { graph, status, userId } = useCollab();
   const [pending, setPending] = useState<PendingDrop | null>(null);
   const [error, setError] = useState<string>("");
 
@@ -49,9 +49,9 @@ const confirm = useCallback(
 
     try {
       if (pending.type === "equipment") {
-        createEquipment(graph, id, finalName);
+        createEquipment(graph, id, finalName, userId);
       } else {
-        createPort(graph, id, finalName);
+        createPort(graph, id, finalName, userId);
 
         // ✅ apply chosen port type (only relevant for ports)
         if (payload.portType) setPortType(graph, id, payload.portType);

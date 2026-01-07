@@ -12,6 +12,7 @@ export abstract class CComponent extends collabs.CObject {
 
   readonly parentId: collabs.CVar<string | null>;
   readonly position: collabs.CVar<{ x: number; y: number }>;
+  readonly createdBy: collabs.CVar<string>;
 
   constructor(
     init: collabs.InitToken,
@@ -41,6 +42,8 @@ export abstract class CComponent extends collabs.CObject {
       "position",
       i => new collabs.CVar(i, { x: 0, y: 0 })
     );
+
+    this.createdBy = this.registerCollab("createdBy", i => new collabs.CVar(i, ""));
   }
 }
 

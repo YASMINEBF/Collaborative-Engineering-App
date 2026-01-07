@@ -11,8 +11,8 @@ function asPort(graph: CEngineeringGraph, id: ComponentId): CPort | null {
   return c.type.value === "port" ? (c as CPort) : null;
 }
 
-export function createPort(graph: CEngineeringGraph, id: ComponentId, name: string) {
-  createComponent(graph, id, "port", name);
+export function createPort(graph: CEngineeringGraph, id: ComponentId, name: string, createdBy?: string) {
+  createComponent(graph, id, "port", name, createdBy);
 }
 
 export function setPortCapacity(graph: CEngineeringGraph, id: ComponentId, capacity: number) {

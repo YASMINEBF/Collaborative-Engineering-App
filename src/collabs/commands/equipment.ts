@@ -12,8 +12,8 @@ function asEquipment(graph: CEngineeringGraph, id: ComponentId): CEquipment | nu
   return c.type.value === "equipment" ? (c as CEquipment) : null;
 }
 
-export function createEquipment(graph: CEngineeringGraph, id: ComponentId, name: string) {
-  createComponent(graph, id, "equipment", name);
+export function createEquipment(graph: CEngineeringGraph, id: ComponentId, name: string, createdBy?: string) {
+  createComponent(graph, id, "equipment", name, createdBy);
 }
 
 export function setEquipmentSize(graph: CEngineeringGraph, id: ComponentId, w: number, h: number) {

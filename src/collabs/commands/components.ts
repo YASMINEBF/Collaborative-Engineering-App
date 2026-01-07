@@ -35,7 +35,8 @@ export function createComponent(
   graph: CEngineeringGraph,
   id: ComponentId,
   type: ComponentType,
-  uniqueName: string
+  uniqueName: string,
+  createdBy?: string
 ) {
   const normalized = normalizeName(uniqueName);
 
@@ -47,6 +48,16 @@ export function createComponent(
 
   // Keep index in sync
   graph.nameIndex.set(normalized, id);
+
+  // Set createdBy on the newly-created component if available
+  try {
+    const c = graph.components.get(id) as any;
+    if (c && typeof c.createdBy !== "undefined") {
+      c.createdBy.value = createdBy ?? "";
+    }
+  } catch (e) {
+    // Ignore if map doesn't return a collab object in some setups
+  }
 }
 
 /** Rename component + maintain nameIndex. */
