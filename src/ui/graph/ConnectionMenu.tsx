@@ -1,5 +1,5 @@
 import  { useEffect } from "react";
-import "../styles/connectionMenu.css";
+import "../styles/connection.css";
 import type { RelationshipKind } from "../../models/relationships/enums/RelationshipTypes";
 import { StructuralKind, LogicalKind, PhysicalKind } from "../../models/relationships/enums/RelationshipTypes";
 
@@ -8,6 +8,7 @@ export type ConnectionMenuChoice = RelationshipKind | ""; // "" = cancel
 type Props = {
   position: { x: number; y: number } | null; // screen coords relative to canvas wrapper
   onChoose: (kind: ConnectionMenuChoice) => void;
+  onClose: () => void;
 };
 
 export default function ConnectionMenu({ position, onChoose }: Props) {

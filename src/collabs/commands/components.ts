@@ -1,6 +1,7 @@
 // collabs/commands/components.ts
 import type { CEngineeringGraph, ComponentId } from "../model/CEngineeringGraph";
 import type { ComponentType } from "../model/ComponentTypes";
+import { deleteRelationshipsForComponent } from "./relationships";
 
 /** Keep name handling consistent everywhere. */
 function normalizeName(name: string): string {
@@ -88,15 +89,13 @@ export function deleteComponent(graph: CEngineeringGraph, id: ComponentId) {
   const c = graph.components.get(id);
   if (!c) return;
 
+  // 1) delete attached relationships first (referential integrity)
+  deleteRelationshipsForComponent(graph, id);
+
+  // 2) clean name index
   const name = c.uniqueName.value;
   if (name) graph.nameIndex.delete(name);
 
-  // Optional: also delete relationships connected to this component.
-  // for (const rel of graph.relationships.values()) {
-  //   if (rel.sourceId.value === id || rel.targetId.value === id) {
-  //     graph.relationships.delete(rel.id.value);
-  //   }
-  // }
-
+  // 3) delete the component
   graph.components.delete(id);
 }

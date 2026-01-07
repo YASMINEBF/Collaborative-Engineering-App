@@ -1,8 +1,7 @@
-// collabs/model/CEngineeringGraph.ts
 import * as collabs from "@collabs/collabs";
 
 import type { ComponentType } from "./ComponentTypes";
-import  CEquipment from "./CEquipment";
+import CEquipment from "./CEquipment";
 import CPort from "./CPort";
 
 import CRelationship from "../CRelationship";
@@ -28,7 +27,9 @@ export type RelationshipSetArgs = [
   kind: RelationshipKind,
   sourceId: string,
   targetId: string,
-  medium: Medium | null
+  medium: Medium | null,
+  sourceHandle?: string | null,
+  targetHandle?: string | null
 ];
 export type ConflictSetArgs = [kind: ConflictKind];
 
@@ -58,7 +59,6 @@ export class CEngineeringGraph extends collabs.CObject {
               return new CPort(valueInit, id, 0, Medium.Water, uniqueName, PortType.Input);
 
             default: {
-              // Compile-time exhaustiveness + runtime safety if old/corrupt data appears
               const _exhaustive: never = type;
               throw new Error(`Unknown component type: ${String(_exhaustive)}`);
             }
@@ -70,10 +70,19 @@ export class CEngineeringGraph extends collabs.CObject {
     this.relationships = this.registerCollab("relationships", (i) =>
       new collabs.CMap<RelId, CRelationship, RelationshipSetArgs>(
         i,
-        (valueInit, id, type, kind, sourceId, targetId, medium) => {
-          const rel = new CRelationship(valueInit, id, type, kind, sourceId, targetId);
-          rel.medium.value = medium;
-          return rel;
+        (valueInit, id, type, kind, sourceId, targetId, medium, sourceHandle, targetHandle) => {
+          // ✅ IMPORTANT: do NOT do rel.medium.value = medium here (it sends during receive/load)
+          return new CRelationship(
+            valueInit,
+            id,
+            type,
+            kind,
+            sourceId,
+            targetId,
+            medium,
+            sourceHandle ?? null,
+            targetHandle ?? null
+          );
         }
       )
     );
@@ -85,8 +94,15 @@ export class CEngineeringGraph extends collabs.CObject {
       )
     );
 
-    this.nameIndex = this.registerCollab("nameIndex", (i) => new collabs.CValueMap<string, ComponentId>(i));
-    this.feedsByPortMedium = this.registerCollab("feedsByPortMedium", (i) => new collabs.CValueMap<string, RelId>(i));
+    this.nameIndex = this.registerCollab(
+      "nameIndex",
+      (i) => new collabs.CValueMap<string, ComponentId>(i)
+    );
+
+    this.feedsByPortMedium = this.registerCollab(
+      "feedsByPortMedium",
+      (i) => new collabs.CValueMap<string, RelId>(i)
+    );
   }
 }
 

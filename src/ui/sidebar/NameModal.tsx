@@ -1,16 +1,23 @@
 // src/ui/sidebar/NameModal.tsx
 import { useEffect, useState } from "react";
 import "../styles/modal.css";
+import { PortType } from "../../models/attributes/enums/PortType";
 
 type Props = {
   open: boolean;
   title?: string;
   placeholder?: string;
   initialValue?: string;
+
   error?: string;
   onChangeValue?: () => void;
+
+  // ✅ show this only when creating a port
+  showPortType?: boolean;
+  initialPortType?: PortType;
+  onConfirm: (payload: { name: string; portType?: PortType }) => void;
+
   onCancel: () => void;
-  onConfirm: (name: string) => void;
 };
 
 export default function NameModal({
@@ -20,26 +27,33 @@ export default function NameModal({
   initialValue = "",
   error,
   onChangeValue,
-  onCancel,
+
+  showPortType = false,
+  initialPortType = PortType.Input,
   onConfirm,
+
+  onCancel,
 }: Props) {
   const [name, setName] = useState(initialValue);
+  const [portType, setPortType] = useState<PortType>(initialPortType);
 
   useEffect(() => {
-    if (open) setName(initialValue);
-  }, [open, initialValue]);
+    if (!open) return;
+    setName(initialValue);
+    setPortType(initialPortType);
+  }, [open, initialValue, initialPortType]);
 
   if (!open) return null;
 
   const trimmed = name.trim();
 
+  const submit = () => {
+    if (!trimmed) return;
+    onConfirm({ name: trimmed, portType: showPortType ? portType : undefined });
+  };
+
   return (
-    <div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      onMouseDown={onCancel}
-    >
+    <div className="modal-overlay" role="dialog" aria-modal="true" onMouseDown={onCancel}>
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
         <h3 className="modal-title">{title}</h3>
 
@@ -50,37 +64,35 @@ export default function NameModal({
           placeholder={placeholder}
           onChange={(e) => {
             setName(e.target.value);
-            onChangeValue?.(); // clears error while typing
+            onChangeValue?.();
           }}
           onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.preventDefault();
-              e.stopPropagation();
-              onCancel();
-              return;
-            }
-
-            if (e.key === "Enter") {
-              e.preventDefault();
-              e.stopPropagation();
-              if (trimmed) onConfirm(trimmed);
-            }
+            if (e.key === "Escape") onCancel();
+            if (e.key === "Enter") submit();
           }}
         />
+
+        {showPortType && (
+          <div className="modal-row">
+            <label className="modal-label">Port type</label>
+            <select
+              className="modal-select"
+              value={portType}
+              onChange={(e) => setPortType(e.target.value as PortType)}
+            >
+              <option value={PortType.Input}>Input</option>
+              <option value={PortType.Output}>Output</option>
+            </select>
+          </div>
+        )}
 
         {error && <div className="modal-error">{error}</div>}
 
         <div className="modal-actions">
-          <button type="button" className="modal-button cancel" onClick={onCancel}>
+          <button className="modal-button cancel" onClick={onCancel}>
             Cancel
           </button>
-
-          <button
-            type="button"
-            className="modal-button confirm"
-            onClick={() => onConfirm(trimmed)}
-            disabled={!trimmed}
-          >
+          <button className="modal-button confirm" onClick={submit} disabled={!trimmed}>
             Create
           </button>
         </div>
@@ -88,3 +100,4 @@ export default function NameModal({
     </div>
   );
 }
+

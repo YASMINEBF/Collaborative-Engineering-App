@@ -39,7 +39,9 @@ export const PortNode: React.FC<NodeProps<PortData>> = ({ data, selected }) => {
         opacity: isLockedByOthers ? 0.6 : 1,
       }}
     >
-      <Handle type="target" position={Position.Left} className="node-handle" />
+      {/* Left side: allow both incoming and outgoing connections so handle position doesn't force direction */}
+      <Handle type="target" position={Position.Left} id="left-target" className="node-handle" />
+      <Handle type="source" position={Position.Left} id="left-source" className="node-handle" />
 
       <div>{label}</div>
 
@@ -61,7 +63,9 @@ export const PortNode: React.FC<NodeProps<PortData>> = ({ data, selected }) => {
         </div>
       )}
 
-      <Handle type="source" position={Position.Right} className="node-handle" />
+      {/* Right side: also allow both */}
+      <Handle type="target" position={Position.Right} id="right-target" className="node-handle" />
+      <Handle type="source" position={Position.Right} id="right-source" className="node-handle" />
     </div>
   );
 };

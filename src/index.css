@@ -90,3 +90,13 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Hide React Flow attribution (small bottom-right text/button) */
+.reactflow__attribution,
+.react-flow__attribution,
+.reactflow__attribution *,
+.react-flow__attribution * {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}

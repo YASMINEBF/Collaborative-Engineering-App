@@ -1,0 +1,86 @@
+/* =========================
+   Base edge styling
+   ========================= */
+
+/* Base edge color + arrowhead color (markerEnd uses this) */
+.react-flow__edge {
+  color: #f6dc14;
+}
+
+/* The actual SVG path */
+.react-flow__edge-path {
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+/* =========================
+   Relationship types
+   ========================= */
+
+/* Has Part → structural (dashed, green) */
+.edge-haspart {
+  color: #4caf50;
+}
+.edge-haspart .react-flow__edge-path {
+  stroke-width: 2.5;
+  stroke-dasharray: 6 4;
+}
+
+/* Controls → logical (solid, blue) */
+.edge-controls {
+  color: #2196f3;
+}
+.edge-controls .react-flow__edge-path {
+  stroke-width: 2.5;
+}
+
+/* Feeds → physical (thicker, orange) */
+.edge-feeds {
+  color: #ff9800;
+}
+.edge-feeds .react-flow__edge-path {
+  stroke-width: 3;
+}
+
+/* =========================
+   Hover feedback
+   ========================= */
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3.5;
+}
+
+/* =========================
+   Selection feedback
+   ========================= */
+
+.react-flow__edge.selected {
+  color: #00bcd4;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 6px rgba(0, 188, 212, 0.18));
+}
+
+/* =========================
+   Arrowhead styling
+   ========================= */
+
+/* Ensure arrowheads inherit edge color */
+.react-flow__edge .react-flow__arrowhead {
+  fill: currentColor;
+}
+
+/* Make arrowheads slightly larger and crisp */
+.react-flow__edge .react-flow__arrowhead path {
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 0;
+}
+
+/* Optional: enlarge arrowheads */
+.react-flow__edge .react-flow__arrowhead {
+  transform: scale(1.2);
+}

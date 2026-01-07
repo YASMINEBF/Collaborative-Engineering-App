@@ -1,4 +1,3 @@
-// src/ui/graph/GraphCanvas.tsx
 import "reactflow/dist/style.css";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
@@ -9,27 +8,46 @@ import ReactFlow, {
   applyNodeChanges,
   type Node,
   type NodeChange,
+  type Connection,
+  type Edge,
 } from "reactflow";
 
 import { useCollab } from "../../collabs/provider/CollabProvider";
+import ConnectionToggle from "./ConnectionToggle";
 import { useGraphNodes } from "../../hooks/useGraphNodes";
+import { useGraphEdges } from "../../hooks/useGraphEdges";
 
 import { EquipmentNode } from "./EquipmentNode";
 import { PortNode } from "./PortNode";
 
 import { setComponentPosition, deleteComponent } from "../../collabs/commands/components";
+import { createRelationship, deleteRelationship } from "../../collabs/commands/relationships";
+
+import type { RelationshipKind } from "../../models/relationships/enums/RelationshipTypes";
+import ConnectionMenu from "./ConnectionMenu";
+
+import "../styles/edges.css"; // edge-haspart/edge-controls/edge-feeds
 
 export type PaletteType = "equipment" | "port";
+
+type PendingConnect = {
+  conn: Connection;
+  menuPos: { x: number; y: number }; // coords in wrapper space
+};
 
 function InnerCanvas(props: {
   onDropped: (type: PaletteType, position: { x: number; y: number }) => void;
 }) {
   const { onDropped } = props;
 
-  const { doc, graph, status } = useCollab();
+  const { doc, graph, status, provider, isConnected } = useCollab();
+
   const computedNodes = useGraphNodes(status === "ready" ? { doc, graph } : null);
+  const computedEdges = useGraphEdges(status === "ready" ? { doc, graph } : null);
 
   const [rfNodes, setRfNodes] = useState<Node[]>([]);
+  const [pendingConnect, setPendingConnect] = useState<PendingConnect | null>(null);
+
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const reactFlow = useReactFlow();
 
@@ -41,17 +59,13 @@ function InnerCanvas(props: {
     []
   );
 
-  // Sync local ReactFlow nodes from Collabs-derived nodes,
-  // but preserve UI-only fields like "selected".
+  // Sync nodes (preserve selection)
   useEffect(() => {
     setRfNodes((prev) => {
       const prevById = new Map(prev.map((n) => [n.id, n]));
       return computedNodes.map((n) => {
         const old = prevById.get(n.id);
-        return {
-          ...n,
-          selected: old?.selected ?? false,
-        };
+        return { ...n, selected: old?.selected ?? false };
       });
     });
   }, [computedNodes]);
@@ -69,7 +83,7 @@ function InnerCanvas(props: {
     [graph, status]
   );
 
-  // Delete from Collabs (source of truth). ReactFlow will update after doc change.
+  // Delete from Collabs (source of truth).
   const onNodesDelete = useCallback(
     (deleted: Node[]) => {
       if (status !== "ready" || !graph) return;
@@ -77,6 +91,17 @@ function InnerCanvas(props: {
     },
     [graph, status]
   );
+
+  // Delete edges from Collabs when removed from the canvas (source of truth).
+  const onEdgesDelete = useCallback(
+    (deleted: Edge[]) => {
+      if (status !== "ready" || !graph) return;
+      for (const e of deleted) deleteRelationship(graph, e.id);
+    },
+    [graph, status]
+  );
+
+  // ===== Drag & Drop create components =====
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -93,14 +118,80 @@ function InnerCanvas(props: {
       const bounds = wrapperRef.current?.getBoundingClientRect();
       if (!bounds) return;
 
-      const position = reactFlow.project({
-        x: e.clientX - bounds.left,
-        y: e.clientY - bounds.top,
-      });
+      const position = reactFlow.screenToFlowPosition({
+      x: e.clientX,
+      y: e.clientY,
+    });
 
       onDropped(type, position);
     },
     [onDropped, reactFlow]
+  );
+
+  // ===== Connect → open menu near target =====
+
+  const onConnect = useCallback(
+    (conn: Connection) => {
+      if (status !== "ready" || !graph) return;
+      if (!conn.source || !conn.target) return;
+
+      const bounds = wrapperRef.current?.getBoundingClientRect();
+      if (!bounds) return;
+
+      const targetNode = reactFlow.getNode(conn.target);
+      if (!targetNode) return;
+
+      // Convert target node flow coords -> wrapper screen coords
+      const { x: vx, y: vy, zoom } = reactFlow.getViewport();
+
+      // Place menu near the target node (top-right-ish).
+      // This uses node position; if you want exact center, we can refine later using measured size.
+      const menuX = targetNode.position.x * zoom + vx + 140;
+      const menuY = targetNode.position.y * zoom + vy + 10;
+
+      setPendingConnect({
+        conn,
+        menuPos: { x: menuX, y: menuY },
+      });
+    },
+    [graph, status, reactFlow]
+  );
+
+  const closeMenu = useCallback(() => setPendingConnect(null), []);
+
+  const toggleConnection = useCallback(() => {
+    if (!provider) return;
+    if (isConnected) provider.disconnect();
+    else provider.connect();
+  }, [provider, isConnected]);
+
+  const onChooseConnectionType = useCallback(
+    (kind: RelationshipKind | "") => {
+      // "" means cancel
+      if (!pendingConnect) return;
+
+      const { conn } = pendingConnect;
+      setPendingConnect(null);
+
+      if (!kind) return;
+      if (status !== "ready" || !graph) return;
+      if (!conn.source || !conn.target) return;
+
+      const id = `rel-${Date.now()}`;
+      // medium = null for now (you can add a second small prompt for feeds later)
+      // preserve the handle ids the user connected to so the edge attaches correctly
+      createRelationship(
+        graph,
+        id,
+        kind,
+        conn.source,
+        conn.target,
+        null,
+        (conn as any).sourceHandle ?? null,
+        (conn as any).targetHandle ?? null
+      );
+    },
+    [pendingConnect, graph, status]
   );
 
   if (status === "loading") return <div>Loading collab…</div>;
@@ -115,26 +206,41 @@ function InnerCanvas(props: {
         height: "100%",
         border: "1px solid #ddd",
         borderRadius: 8,
+        position: "relative", //  needed so menu can be absolutely positioned
       }}
       onDrop={onDrop}
       onDragOver={onDragOver}
     >
       <ReactFlow
         nodes={rfNodes}
-        edges={[]}
+        edges={computedEdges as Edge[]}
         nodeTypes={nodeTypes}
         fitView
+        connectionRadius={40}
         onNodesChange={onNodesChange}
         onNodeDragStop={onNodeDragStop}
         onNodesDelete={onNodesDelete}
-        deleteKeyCode={["Backspace", "Delete"]} // ✅ press Del/Backspace to delete selected nodes
-        nodesDraggable={true}
-        nodesConnectable={true}
-        elementsSelectable={true}
+        onEdgesDelete={onEdgesDelete}
+        onConnect={onConnect}
+        deleteKeyCode={["Backspace", "Delete"]}
+        nodesDraggable
+        nodesConnectable
+        elementsSelectable
       >
         <Background />
         <Controls />
       </ReactFlow>
+
+      <ConnectionMenu
+        position={pendingConnect?.menuPos ?? null}
+        onChoose={onChooseConnectionType}
+        onClose={closeMenu}
+      />
+
+      {/* Connection toggle placed bottom-right inside the graph wrapper */}
+      <div style={{ position: "absolute", right: 12, bottom: 20, zIndex: 100 }}>
+        <ConnectionToggle isConnected={!!isConnected} onToggle={toggleConnection} />
+      </div>
     </div>
   );
 }

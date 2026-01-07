@@ -9,6 +9,14 @@ export type CollabContextType = {
   doc: any | null;
   graph: any | null;
   error?: unknown;
+  // Exposed control object for connecting/disconnecting the network
+  provider?: {
+    connect: () => void;
+    disconnect: () => void;
+    network?: any;
+  } | null;
+  // Network connection state
+  isConnected?: boolean;
 };
 
 const CollabContext = createContext<CollabContextType>({
@@ -26,9 +34,12 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
     status: "loading",
     doc: null,
     graph: null,
+    provider: null,
+    isConnected: false,
   });
 
   const networkRef = useRef<any>(null);
+  const connectedRef = useRef<boolean>(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,10 +49,35 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
         if (cancelled) return;
         networkRef.current = (setup as any).network ?? null;
 
+        // connection flag
+        connectedRef.current = false;
+
+        // Attach connect/disconnect handlers if available
+        try {
+          networkRef.current?.on?.("Connect", () => {
+            connectedRef.current = true;
+            setState((s) => ({ ...s, isConnected: true }));
+          });
+          networkRef.current?.on?.("Disconnect", () => {
+            connectedRef.current = false;
+            setState((s) => ({ ...s, isConnected: false }));
+          });
+        } catch (e) {
+          // ignore
+        }
+
+        const providerObj = {
+          connect: () => networkRef.current?.connect?.(),
+          disconnect: () => networkRef.current?.disconnect?.(),
+          network: networkRef.current,
+        };
+
         setState({
           status: "ready",
           doc: setup.doc,
           graph: setup.graph,
+          provider: providerObj,
+          isConnected: connectedRef.current,
         });
       })
       .catch((e) => {
@@ -56,6 +92,7 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
         networkRef.current?.disconnect?.();
       } catch {}
       networkRef.current = null;
+      connectedRef.current = false;
     };
   }, []);
 

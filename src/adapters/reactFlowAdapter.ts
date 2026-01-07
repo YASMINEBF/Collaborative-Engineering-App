@@ -1,6 +1,7 @@
 // src/adapters/reactFlowAdapter.ts
 import type { Edge, Node } from "reactflow";
-import type { RelationshipKind } from "../models/relationships/enums/RelationshipTypes";
+import { MarkerType } from "reactflow";
+import { LogicalKind, type RelationshipKind } from "../models/relationships/enums/RelationshipTypes";
 import type { Medium } from "../models/attributes/enums/Medium";
 
 /**
@@ -139,19 +140,48 @@ export function cRelationshipToReactFlowEdge(r: CRelationshipLike): Edge | null 
   const target = String(readVar<string>((r as any).targetId, "")).trim();
   if (!source || !target) return null;
 
-  const kind = readVar<RelationshipKind | string>((r as any).kind, "controls" as any);
-  const medium = readVar<Medium | null>((r as any).medium, null);
+  const kind = readVar<RelationshipKind>((r as any).kind, LogicalKind.Controls);
+  const kindClass = String(kind).toLowerCase();
+  const sourceHandle = readVar<string | null>((r as any).sourceHandle, null);
+  const targetHandle = readVar<string | null>((r as any).targetHandle, null);
+
+  // ✅ Calculate offset for bidirectional edges
+  // If source > target alphabetically, offset one direction, otherwise offset the other
+  // This ensures consistent offsetting for edge pairs
+  const needsOffset = source > target || (source === target && (sourceHandle || '') > (targetHandle || ''));
+  const offset = needsOffset ? 20 : -20; // pixels
 
   return {
     id,
     source,
     target,
-    type: "default",
-    label: String(kind), // optional (remove if you don't want labels)
-    data: {
-      kind,
-      medium,
+    type: "smoothstep",
+    className: `edge-${kindClass}`,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
     },
+    ...(sourceHandle ? { sourceHandle } : {}),
+    ...(targetHandle ? { targetHandle } : {}),
+    
+    // ✅ Store offset in data for custom edge component
+    data: {
+      offset: offset,
+    },
+
+    label: String(kind),
+    
+    // ✅ Style the label to prevent overlap
+    labelStyle: { 
+      fill: '#333',
+      fontWeight: 600,
+      fontSize: 12,
+    },
+    labelBgStyle: { 
+      fill: 'white',
+      fillOpacity: 0.9,
+    },
+    labelBgPadding: [8, 4] as [number, number],
+    labelBgBorderRadius: 4,
   };
 }
 

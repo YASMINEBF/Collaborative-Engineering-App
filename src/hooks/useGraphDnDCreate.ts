@@ -4,6 +4,8 @@ import { useCollab } from "../collabs/provider/CollabProvider";
 import { createEquipment } from "../collabs/commands/equipment";
 import { createPort } from "../collabs/commands/ports";
 import { setComponentPosition } from "../collabs/commands/components";
+import { PortType } from "../models";
+import {setPortType} from "../collabs/commands/ports";
 
 type PaletteType = "equipment" | "port";
 type PendingDrop = { type: PaletteType; position: { x: number; y: number } };
@@ -14,6 +16,9 @@ export function useGraphDnDCreate() {
   const [error, setError] = useState<string>("");
 
   const canEdit = status === "ready" && !!graph;
+
+  const showPortType = pending?.type === "port";
+
 
   const title = useMemo(() => {
     if (!pending) return "";
@@ -34,32 +39,38 @@ export function useGraphDnDCreate() {
     setPending(null);
   }, []);
 
-  const confirm = useCallback(
-    (name: string) => {
-      if (!pending || !canEdit || !graph) return;
+const confirm = useCallback(
+  (payload: { name: string; portType?: PortType }) => {
+    if (!pending || !canEdit || !graph) return;
 
-      const id =
-        pending.type === "equipment" ? `eq-${Date.now()}` : `port-${Date.now()}`;
-      const finalName = name.trim() || id;
+    const id =
+      pending.type === "equipment" ? `eq-${Date.now()}` : `port-${Date.now()}`;
+    const finalName = payload.name.trim() || id;
 
-      try {
-        if (pending.type === "equipment") createEquipment(graph, id, finalName);
-        else createPort(graph, id, finalName);
+    try {
+      if (pending.type === "equipment") {
+        createEquipment(graph, id, finalName);
+      } else {
+        createPort(graph, id, finalName);
 
-        setComponentPosition(graph, id, pending.position);
-
-        setError("");
-        setPending(null);
-      } catch (e: any) {
-        setError(e?.message ?? "Could not create component.");
+        // ✅ apply chosen port type (only relevant for ports)
+        if (payload.portType) setPortType(graph, id, payload.portType);
       }
-    },
-    [pending, canEdit, graph]
-  );
 
-  const clearError = useCallback(() => setError(""), []);
+      setComponentPosition(graph, id, pending.position);
 
-  return { canEdit, pending, title, error, clearError, openForDrop, cancel, confirm };
+      setError("");
+      setPending(null);
+    } catch (e: any) {
+      setError(e?.message ?? "Could not create component.");
+    }
+  },
+  [pending, canEdit, graph]
+);
+
+const clearError = useCallback(() => setError(""), []);
+
+return { canEdit, pending, title, error, showPortType, clearError, openForDrop, cancel, confirm };
 }
 
 export default useGraphDnDCreate;

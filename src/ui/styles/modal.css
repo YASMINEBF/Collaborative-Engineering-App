@@ -77,3 +77,31 @@
   color: #d32f2f;
   font-size: 12px;
 }
+/* src/ui/styles/modal.css */
+.modal-row {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.modal-label {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.modal-select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.18);
+  background: white;
+  font-size: 14px;
+  outline: none;
+}
+
+.modal-select:focus {
+  border-color: rgba(0, 188, 212, 0.9);
+  box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.15);
+}
