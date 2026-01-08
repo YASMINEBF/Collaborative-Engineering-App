@@ -37,6 +37,8 @@ type PendingConnect = {
 
 function InnerCanvas(props: {
   onDropped: (type: PaletteType, position: { x: number; y: number }) => void;
+  onSelectNode: (id: string | null) => void;
+
 }) {
   const { onDropped } = props;
 
@@ -128,6 +130,22 @@ function InnerCanvas(props: {
     [onDropped, reactFlow]
   );
 
+  // attributes
+const onSelectionChange = useCallback(
+  ({ nodes }: { nodes: Node[]; edges: Edge[] }) => {
+    props.onSelectNode(nodes.length ? nodes[0].id : null);
+  },
+  [props.onSelectNode]
+);
+
+
+const onPaneClick = useCallback(() => {
+  props.onSelectNode(null);
+}, [props.onSelectNode]);
+
+
+
+
   // ===== Connect → open menu near target =====
 
   const onConnect = useCallback(
@@ -217,6 +235,8 @@ function InnerCanvas(props: {
         nodeTypes={nodeTypes}
         fitView
         connectionRadius={40}
+        onSelectionChange={onSelectionChange} 
+        onPaneClick={onPaneClick}
         onNodesChange={onNodesChange}
         onNodeDragStop={onNodeDragStop}
         onNodesDelete={onNodesDelete}
@@ -247,10 +267,14 @@ function InnerCanvas(props: {
 
 export default function GraphCanvas(props: {
   onDropped: (type: PaletteType, position: { x: number; y: number }) => void;
+  onSelectNode: (id: string | null) => void;
 }) {
   return (
     <ReactFlowProvider>
-      <InnerCanvas onDropped={props.onDropped} />
+      <InnerCanvas
+        onDropped={props.onDropped}
+        onSelectNode={props.onSelectNode}
+      />
     </ReactFlowProvider>
   );
 }
