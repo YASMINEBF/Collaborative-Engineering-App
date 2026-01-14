@@ -4,9 +4,11 @@ import { useCallback, useState } from "react";
 import Sidebar from "./sidebar/Sidebar";
 import GraphCanvas from "./graph/GraphCanvas";
 import NameModal from "./sidebar/NameModal";
+import AttributesSidebar from "./attributesSidebar/AttributesSidebar";
 import { useGraphDnDCreate } from "../hooks/useGraphDnDCreate";
 
-import AttributesSidebar from "./attributesSidebar/Attributessidebar"; // ✅ adjust path if needed
+
+// Note: CollabStatus component removed.
 
 // Connection toggle is rendered inside the graph canvas now.
 
@@ -30,7 +32,7 @@ export default function Editor() {
           <GraphCanvas onDropped={openForDrop} onSelectNode={setSelectedNodeId} />
         </div>
 
-        {/* ✅ Right-side attributes sidebar */}
+        {/*  Right-side attributes sidebar */}
         <AttributesSidebar selectedNodeId={selectedNodeId} onClose={closeAttributes} />
 
         {/* Name modal */}

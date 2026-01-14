@@ -6,6 +6,8 @@ import { Medium } from "../../models/attributes/enums/Medium";
 export class CEquipment extends CComponent {
   readonly width: collabs.CVar<number>;
   readonly height: collabs.CVar<number>;
+  readonly widthUnit: collabs.CVar<string>;
+  readonly heightUnit: collabs.CVar<string>;
   readonly color: collabs.CVar<Color>;
   readonly inputMedium: collabs.CVar<Medium>;
   readonly outputMedium: collabs.CVar<Medium>;
@@ -16,6 +18,8 @@ export class CEquipment extends CComponent {
 
     this.width = this.registerCollab("width", i => new collabs.CVar(i, 0));
     this.height = this.registerCollab("height", i => new collabs.CVar(i, 0));
+    this.widthUnit = this.registerCollab("widthUnit", i => new collabs.CVar<string>(i, "mm"));
+    this.heightUnit = this.registerCollab("heightUnit", i => new collabs.CVar<string>(i, "mm"));
     this.color = this.registerCollab(
       "color",
       i => new collabs.CVar<Color>(i, Color.Red)

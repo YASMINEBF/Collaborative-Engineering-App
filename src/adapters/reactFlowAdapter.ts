@@ -23,6 +23,10 @@ export type CComponentLike = {
   uniqueName?: CVarLike<string> | string;
   title?: CVarLike<string> | string;
 
+  // Optional media values (may be stored as CVar or plain)
+  inputMedium?: CVarLike<Medium> | Medium;
+  outputMedium?: CVarLike<Medium> | Medium;
+
   position?: CVarLike<{ x: number; y: number }> | { x: number; y: number };
 };
 
@@ -142,14 +146,24 @@ export function cRelationshipToReactFlowEdge(r: CRelationshipLike): Edge | null 
 
   const kind = readVar<RelationshipKind>((r as any).kind, LogicalKind.Controls);
   const kindClass = String(kind).toLowerCase();
+
   const sourceHandle = readVar<string | null>((r as any).sourceHandle, null);
   const targetHandle = readVar<string | null>((r as any).targetHandle, null);
 
+  // ✅ read medium from the relationship
+  const medium = readVar<Medium | null>((r as any).medium, null);
+
+    // ✅ label: "feeds (Water)" only for feeds
+    const label =
+      kindClass === "feeds" && medium
+        ? `feeds (${String(medium)})`
+        : String(kind);
+
   // ✅ Calculate offset for bidirectional edges
-  // If source > target alphabetically, offset one direction, otherwise offset the other
-  // This ensures consistent offsetting for edge pairs
-  const needsOffset = source > target || (source === target && (sourceHandle || '') > (targetHandle || ''));
-  const offset = needsOffset ? 20 : -20; // pixels
+  const needsOffset =
+    source > target ||
+    (source === target && (sourceHandle || "") > (targetHandle || ""));
+  const offset = needsOffset ? 20 : -20;
 
   return {
     id,
@@ -157,27 +171,27 @@ export function cRelationshipToReactFlowEdge(r: CRelationshipLike): Edge | null 
     target,
     type: "smoothstep",
     className: `edge-${kindClass}`,
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-    },
+    markerEnd: { type: MarkerType.ArrowClosed },
+
     ...(sourceHandle ? { sourceHandle } : {}),
     ...(targetHandle ? { targetHandle } : {}),
-    
-    // ✅ Store offset in data for custom edge component
+
     data: {
-      offset: offset,
+      offset,
+      // (optional but nice to have in UI)
+      kind,
+      medium,
     },
 
-    label: String(kind),
-    
-    // ✅ Style the label to prevent overlap
-    labelStyle: { 
-      fill: '#333',
+    label,
+
+    labelStyle: {
+      fill: "#333",
       fontWeight: 600,
       fontSize: 12,
     },
-    labelBgStyle: { 
-      fill: 'white',
+    labelBgStyle: {
+      fill: "white",
       fillOpacity: 0.9,
     },
     labelBgPadding: [8, 4] as [number, number],
@@ -209,7 +223,29 @@ export function graphToReactFlowEdges(graph: CEngineeringGraphLike): Edge[] {
 
   for (const r of valuesOf<CRelationshipLike>(graph.relationships)) {
     const edge = cRelationshipToReactFlowEdge(r);
-    if (edge) edges.push(edge);
+    if (!edge) continue;
+
+    // If feeds edge has no explicit medium, try to derive from components
+    if ((edge.className || "").includes("feeds") && !edge.data?.medium) {
+      try {
+        const srcId = String((r as any)?.sourceId?.value ?? (r as any)?.sourceId ?? "");
+        const tgtId = String((r as any)?.targetId?.value ?? (r as any)?.targetId ?? "");
+        const src = graph.components?.get ? graph.components.get(srcId) : (graph.components ? graph.components[srcId] : undefined);
+        const tgt = graph.components?.get ? graph.components.get(tgtId) : (graph.components ? graph.components[tgtId] : undefined);
+        const srcOut = src ? readVar((src as any).outputMedium, null) : null;
+        const tgtIn = tgt ? readVar((tgt as any).inputMedium, null) : null;
+        const derived = srcOut ?? tgtIn ?? null;
+        if (derived) {
+          const mediumLabel = String(derived);
+          edge.label = `${String(edge.label)} (${mediumLabel})`;
+          edge.data = { ...(edge.data ?? {}), medium: derived };
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    edges.push(edge);
   }
 
   return edges;

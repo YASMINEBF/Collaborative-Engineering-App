@@ -24,6 +24,7 @@ import { setComponentPosition, deleteComponent } from "../../collabs/commands/co
 import { createRelationship, deleteRelationship } from "../../collabs/commands/relationships";
 
 import type { RelationshipKind } from "../../models/relationships/enums/RelationshipTypes";
+import { PhysicalKind } from "../../models/relationships/enums/RelationshipTypes";
 import ConnectionMenu from "./ConnectionMenu";
 
 import "../styles/edges.css"; // edge-haspart/edge-controls/edge-feeds
@@ -194,6 +195,30 @@ const onPaneClick = useCallback(() => {
       if (!kind) return;
       if (status !== "ready" || !graph) return;
       if (!conn.source || !conn.target) return;
+
+      // Pre-validate Feeds connections client-side so we can show an immediate
+      // small notification instead of attempting creation and relying on
+      // the collab conflict machinery. This mirrors the server-side check in
+      // `createRelationship`.
+      if (kind === PhysicalKind.Feeds) {
+        try {
+          const srcId = String(conn.source);
+          const tgtId = String(conn.target);
+          const src = graph.components?.get ? graph.components.get(srcId) : graph.components?.[srcId];
+          const tgt = graph.components?.get ? graph.components.get(tgtId) : graph.components?.[tgtId];
+          const srcOut = src?.outputMedium?.value;
+          const tgtIn = tgt?.inputMedium?.value;
+          if (srcOut !== undefined && tgtIn !== undefined && srcOut !== tgtIn) {
+            const title = "Invalid feeds connection";
+            const message = `Cannot connect: source output (${String(srcOut)}) ≠ target input (${String(tgtIn)})`;
+            window.dispatchEvent(new CustomEvent("ce:notification", { detail: { type: "notify", title, message } }));
+            return;
+          }
+        } catch (e) {
+          // swallow and continue to attempt creation; the server-side logic will
+          // still catch mismatches and record conflicts as needed.
+        }
+      }
 
       const id = `rel-${Date.now()}`;
       // medium = null for now (you can add a second small prompt for feeds later)

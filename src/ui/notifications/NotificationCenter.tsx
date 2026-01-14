@@ -1,4 +1,4 @@
-import  { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import "./notification.css";
 import { useCollab } from "../../collabs/provider/CollabProvider";
 import { ConflictKind } from "../../collabs/model/enums/ConflictEnum";
@@ -19,7 +19,9 @@ export function NotificationCenter() {
     function onEvent(e: any) {
       const d = e.detail;
       if (!d) return;
-
+      // Support different notification event shapes. Existing callers emit
+      // `{ type: 'rename', oldName, newName, affectedId }`. We also accept
+      // `{ type: 'notify', title, message }` for arbitrary UI notifications.
       if (d.type === "rename") {
         const id = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const title = "Name conflict resolved";
@@ -28,6 +30,16 @@ export function NotificationCenter() {
         setItems((s) => [n, ...s].slice(0, 6));
 
         // Auto-remove after 6s
+        setTimeout(() => {
+          setItems((s) => s.filter((x) => x.id !== id));
+        }, 6000);
+      } else if (d.type === "notify") {
+        const id = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const title = d.title ?? "Notification";
+        const message = d.message ?? "";
+        const n = { id, title, message, ts: Date.now() };
+        setItems((s) => [n, ...s].slice(0, 6));
+
         setTimeout(() => {
           setItems((s) => s.filter((x) => x.id !== id));
         }, 6000);

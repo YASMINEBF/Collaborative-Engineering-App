@@ -3,6 +3,7 @@ export enum ConflictKind {
   InvalidFeedCardinality = "invalidFeedCardinality",
   DanglingReference = "danglingReference",
   CycleDetected = "cycleDetected",
+  FeedMediumMismatch = "feedMediumMismatch",
 }
 
 export default {

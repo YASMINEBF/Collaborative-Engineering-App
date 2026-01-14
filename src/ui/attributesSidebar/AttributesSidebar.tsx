@@ -1,15 +1,14 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { FaChevronLeft, FaChevronRight, FaTimes } from "react-icons/fa";
 import { useCollab } from "../../collabs/provider/CollabProvider";
 import AttributeRow from "./AttributeRow";
-import { equipmentAttributes, portAttributes } from "./attributeSchema";
+import { equipmentAttributes, portAttributes, capacityUnitOptionsFor } from "./attributeSchema";
+import { validateAndNotifyIfBlocked } from "../../collabs/semantics/mediaChangeValidator";
 import "../styles/attributesSidebar.css";
 
 type Props = {
   selectedNodeId: string | null;
   onClose?: () => void;
-
-  // lock overlay
   isReadOnly?: boolean;
   lockedBy?: string;
 };
@@ -20,12 +19,12 @@ export default function AttributesSidebar({
   isReadOnly = false,
   lockedBy,
 }: Props) {
-  const { status, graph } = useCollab();
+  const { status, graph, doc } = useCollab();
+  const [, setTick] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(true);
 
-  // auto-open when a node gets selected (optional but feels nice)
   useEffect(() => {
-    if (selectedNodeId) setIsCollapsed(false);
+    if (selectedNodeId) setIsCollapsed(true);
   }, [selectedNodeId]);
 
   const selectedComponent = useMemo(() => {
@@ -33,60 +32,67 @@ export default function AttributesSidebar({
     return graph.components.get(selectedNodeId) ?? null;
   }, [status, graph, selectedNodeId]);
 
+  useEffect(() => {
+    if (!doc || status !== "ready") return;
+    const onChange = () => setTick((t) => t + 1);
+    doc.on?.("Change", onChange);
+    return () => doc.off?.("Change", onChange);
+  }, [doc, status]);
+
   const type = selectedComponent?.type?.value ?? null;
-  const schema = type === "equipment" ? equipmentAttributes : type === "port" ? portAttributes : [];
+  const schema =
+    type === "equipment" ? equipmentAttributes :
+    type === "port" ? portAttributes : [];
 
-  const toggleCollapsed = () => setIsCollapsed((v) => !v);
+  const setVar = useCallback((key: string, value: any) => {
+    if (!selectedComponent) return;
+    // If editing equipment media, validate against feeds relationships
+    if ((key === "inputMedium" || key === "outputMedium") && (selectedComponent as any).type?.value === "equipment") {
+      try {
+        const newInput = key === "inputMedium" ? value : (selectedComponent as any)["inputMedium"]?.value;
+        const newOutput = key === "outputMedium" ? value : (selectedComponent as any)["outputMedium"]?.value;
+        const allowed = validateAndNotifyIfBlocked((graph as any), (selectedComponent as any).id?.value ?? (selectedComponent as any).id, newInput, newOutput);
+        if (!allowed) return;
+      } catch (e) {
+        // fall back to direct set if validation fails unexpectedly
+      }
+    }
 
-  // ---- write helpers (keep these tiny; they just set collabs vars) ----
-  const setVar = useCallback((key: string, newValue: any) => {
-    if (status !== "ready" || !graph || !selectedComponent) return;
-    // guard: only if exists
     const field = (selectedComponent as any)[key];
-    if (!field || typeof field !== "object" || !("value" in field)) return;
-    field.value = newValue;
-  }, [status, graph, selectedComponent]);
+    if (field?.value !== undefined) field.value = value;
+  }, [selectedComponent]);
 
   if (!selectedComponent) return null;
 
   return (
     <div
-      className="attr-sidebar-shell"
-      style={{ right: isCollapsed ? "-280px" : "0" }}
+      className={`attr-sidebar-shell ${isCollapsed ? "collapsed" : "expanded"}`}
     >
-      {/* Toggle button */}
       <button
         className="attr-toggle"
-        onClick={toggleCollapsed}
+        onClick={() => setIsCollapsed(v => !v)}
         title={isCollapsed ? "Open" : "Collapse"}
       >
         {isCollapsed ? <FaChevronLeft /> : <FaChevronRight />}
       </button>
 
       <div className="attr-sidebar-inner">
-        {/* Header */}
         <div className="attr-header">
           <h3 className="attr-header-title">Component Details</h3>
-
           {onClose && (
-            <button className="attr-close" onClick={onClose} title="Close">
+            <button className="attr-close" onClick={onClose}>
               <FaTimes />
             </button>
           )}
         </div>
 
-        {/* Lock banner */}
         {isReadOnly && (
           <div className="attr-lock-banner">
-            <span className="lock-icon">🔒</span>
-            <span className="lock-text">
-              Attributes locked by {lockedBy || "another user"}
-            </span>
+            🔒 Attributes locked by {lockedBy || "another user"}
           </div>
         )}
 
         <div className="attr-scroll">
-          {/* Basic info */}
           <div className="attr-card">
             <div className="attr-kv">
               <span className="k">ID</span>
@@ -98,29 +104,40 @@ export default function AttributesSidebar({
             </div>
           </div>
 
-          {/* Editable attributes */}
-          <div
-            className="attr-card"
-            style={{
-              pointerEvents: isReadOnly ? "none" : "auto",
-              opacity: isReadOnly ? 0.6 : 1,
-              cursor: isReadOnly ? "not-allowed" : "default",
-            }}
-          >
+          <div className="attr-card">
             <div className="attr-section-title">Attributes</div>
 
-            {schema.map((def) => (
-              <AttributeRow
-                key={def.key}
-                def={def as any}
-                value={(selectedComponent as any)[def.key]?.value}
-                disabled={isReadOnly}
-                onChange={(val) => setVar(def.key, val)}
-              />
-            ))}
-          </div>
+            {schema.map((def) => {
+              const value = (selectedComponent as any)[def.key]?.value;
 
-          {/* Relationships section can be added right below (next step) */}
+              // unit fields store a companion `${key}Unit` CVar (added to CEquipment/CPort)
+              const unitValue = def.kind === "unit" ? (selectedComponent as any)[`${def.key}Unit`]?.value : undefined;
+
+              // dynamic unit options for capacity depending on medium
+              let defForRow = def as any;
+              if (def.key === "capacity" && type === "port") {
+                const mediumValue = (selectedComponent as any)["medium"]?.value;
+                defForRow = { ...defForRow, unitOptions: capacityUnitOptionsFor(mediumValue) };
+              }
+
+              const onUnitChange = defForRow.kind === "unit" ? (newUnit: string) => {
+                const u = (selectedComponent as any)[`${def.key}Unit`];
+                if (u && typeof u === "object" && "value" in u) u.value = newUnit;
+              } : undefined;
+
+              return (
+                <AttributeRow
+                  key={def.key}
+                  def={defForRow}
+                  value={value}
+                  unitValue={unitValue}
+                  disabled={isReadOnly}
+                  onChange={(val) => setVar(def.key, val)}
+                  onUnitChange={onUnitChange}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

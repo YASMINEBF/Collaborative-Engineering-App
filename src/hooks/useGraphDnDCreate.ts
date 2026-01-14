@@ -1,4 +1,3 @@
-// src/hooks/useGraphDnDCreate.ts
 import { useCallback, useMemo, useState } from "react";
 import { useCollab } from "../collabs/provider/CollabProvider";
 import { createEquipment } from "../collabs/commands/equipment";
@@ -53,7 +52,7 @@ const confirm = useCallback(
       } else {
         createPort(graph, id, finalName, userId);
 
-        // ✅ apply chosen port type (only relevant for ports)
+        //  apply chosen port type (only relevant for ports)
         if (payload.portType) setPortType(graph, id, payload.portType);
       }
 

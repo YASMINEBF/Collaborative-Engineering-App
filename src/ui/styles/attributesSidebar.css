@@ -1,45 +1,64 @@
-/* Shell */
+/* =========================
+   Shell
+   ========================= */
+
 .attr-sidebar-shell {
   position: fixed;
   top: 0;
   right: 0;
-  width: 300px;
+  width: 340px;
   height: 100vh;
   background: #f8f9fa;
   border-left: 1px solid #dee2e6;
-  box-shadow: -2px 0 5px rgba(0,0,0,0.10);
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.10);
   z-index: 1000;
   transition: right 0.3s ease-in-out;
   display: flex;
   flex-direction: column;
 }
 
-/* Toggle */
+/* =========================
+   Toggle Button
+   ========================= */
+
 .attr-toggle {
   position: absolute;
   left: -40px;
   top: 50%;
   transform: translateY(-50%);
   width: 40px;
-  height: 60px;
+  height: 64px;
   background: #f8f9fa;
   border: 1px solid #dee2e6;
   border-right: none;
-  border-radius: 8px 0 0 8px;
+  border-radius: 10px 0 0 10px;
   cursor: pointer;
+
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+
   color: #6c757d;
-  transition: all 0.2s ease;
-  z-index: 1001;
+  transition:  background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  z-index: 2000;
 }
 
 .attr-toggle:hover {
   background: #e9ecef;
-  color: #495057;
+  color: #212529;
+  box-shadow: -2px 0 6px rgba(0, 0, 0, 0.12);
 }
+
+.attr-toggle svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  fill: currentColor;
+}
+
+/* =========================
+   Sidebar Inner
+   ========================= */
 
 .attr-sidebar-inner {
   padding: 20px;
@@ -49,7 +68,10 @@
   overflow: hidden;
 }
 
-/* Header */
+/* =========================
+   Header
+   ========================= */
+
 .attr-header {
   display: flex;
   align-items: center;
@@ -61,20 +83,19 @@
 
 .attr-header-title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 700;
   color: #212529;
 }
 
 .attr-close {
   background: none;
   border: none;
-  font-size: 16px;
+  font-size: 18px;
   color: #6c757d;
   cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
+  padding: 6px;
+  border-radius: 6px;
 }
 
 .attr-close:hover {
@@ -82,127 +103,175 @@
   color: #495057;
 }
 
-/* Lock banner */
-.attr-lock-banner {
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  border-radius: 4px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
+/* =========================
+   Scroll Area
+   ========================= */
 
-.lock-icon { color: #ff9800; }
-.lock-text { color: #856404; font-weight: 500; }
-
-/* Scroll area */
 .attr-scroll {
   flex: 1;
   overflow-y: auto;
   padding-right: 8px;
 }
 
-/* Cards */
+/* =========================
+   Cards
+   ========================= */
+
 .attr-card {
   background: white;
   border: 1px solid #e9ecef;
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 14px;
   margin-bottom: 12px;
 }
 
+/* =========================
+   Section Title
+   ========================= */
+
 .attr-section-title {
-  font-weight: 700;
-  font-size: 14px;
+  font-weight: 800;
+  font-size: 18px;
   color: #212529;
-  margin-bottom: 10px;
+  margin: 6px 0 12px;
 }
 
-/* Key-value rows */
+/* =========================
+   Key–Value Rows (ID / Type)
+   ========================= */
+
 .attr-kv {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  padding: 6px 0;
-  border-bottom: 1px dashed rgba(0,0,0,0.08);
+  padding: 10px 0;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
 }
-.attr-kv:last-child { border-bottom: none; }
+
+.attr-kv:last-child {
+  border-bottom: none;
+}
+
+.attr-kv .k,
+.attr-kv .v {
+  font-size: 16px;
+}
 
 .attr-kv .k {
   color: #6c757d;
-  font-size: 12px;
-  min-width: 70px;
-}
-.attr-kv .v {
-  color: #212529;
-  font-size: 13px;
-  text-align: right;
-  word-break: break-word;
 }
 
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 12px;
+.attr-kv .v {
+  color: #212529;
+  text-align: right;
 }
 
 .pill {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid #dee2e6;
   background: #fff;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 16px;
 }
 
-/* Attribute rows */
+/* =========================
+   Attribute Rows
+   ========================= */
+
 .attr-row {
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: 10px;
+  grid-template-columns: 110px 1fr; /* label | value */
+  gap: 8px;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px dashed rgba(0,0,0,0.08);
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
 }
-.attr-row:last-child { border-bottom: none; }
+
+.attr-row:last-child {
+  border-bottom: none;
+}
 
 .attr-label {
-  font-size: 12px;
+  font-size: 16px; /* same as values */
   color: #6c757d;
+  white-space: nowrap;
 }
+
+/* =========================
+   Controls
+   ========================= */
 
 .attr-control {
   display: flex;
-  justify-content: flex-end;
+  width: 100%;
+  min-width: 0;
 }
 
-/* Inputs */
-.attr-input, .attr-select {
+/* =========================
+   Inputs
+   ========================= */
+
+.attr-input,
+.attr-select {
   width: 100%;
-  max-width: 170px;
   border: 1px solid #dee2e6;
-  border-radius: 6px;
-  padding: 6px 8px;
-  font-size: 13px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 16px;
   background: #fff;
   color: #212529;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
-.attr-input:focus, .attr-select:focus {
+.attr-input:focus,
+.attr-select:focus {
   outline: none;
   border-color: #86b7fe;
-  box-shadow: 0 0 0 3px rgba(13,110,253,0.15);
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
 }
 
-/* Unit combo */
+/* =========================
+   Unit (value + unit)
+   ========================= */
+
 .attr-unit {
   width: 100%;
-  max-width: 170px;
   display: grid;
-  grid-template-columns: 1fr 72px;
+  grid-template-columns: 1fr 72px; /* value flexes, unit fixed */
   gap: 6px;
+  min-width: 0;
+}
+
+.attr-unit .attr-input,
+.attr-unit .attr-select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 12px; /* align with normal inputs */
+  font-size: 16px;
+}
+
+.attr-unit .attr-select {
+  width: 72px;
+}
+
+/* Make unit dropdown text slightly smaller so units de-emphasize visually */
+.attr-unit .attr-select {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+.attr-sidebar-shell {
+  --sidebar-w: 340px;
+  width: var(--sidebar-w);
+}
+.attr-sidebar-shell.collapsed {
+  right: -340px;
+}
+
+.attr-sidebar-shell.expanded {
+  right: 0;
 }

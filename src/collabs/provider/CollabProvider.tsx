@@ -56,7 +56,7 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
         // connection flag
         connectedRef.current = false;
 
-        // Attach connect/disconnect handlers if available
+        // Attach connect/disconnect handlers 
         try {
           networkRef.current?.on?.("Connect", () => {
             connectedRef.current = true;
