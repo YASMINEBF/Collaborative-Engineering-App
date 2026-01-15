@@ -107,6 +107,24 @@ export function NotificationCenter() {
               lastSeen = Math.max(lastSeen, createdAt);
               continue;
             }
+
+            // Cycle detected in structural (hasPart) relationships
+            if (kind === ConflictKind.CycleDetected) {
+              if (status !== "open") continue;
+              if (createdAt <= lastSeen) continue;
+
+              const createdBy = conf.createdBy?.value ?? "unknown";
+              const refs = conf.entityRefs?.values ? Array.from(conf.entityRefs.values()) : [];
+              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+              const title = "Cycle detected (hasPart)";
+              const message = `Cycle detected among relationships: ${refs.join(",")} (reported by ${createdBy})`;
+              const n = { id: idn, title, message, ts: Date.now() };
+              setItems((s) => [n, ...s].slice(0, 6));
+              setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 8000);
+
+              lastSeen = Math.max(lastSeen, createdAt);
+              continue;
+            }
           } catch {}
         }
       } catch (e) {

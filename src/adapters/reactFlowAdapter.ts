@@ -214,7 +214,12 @@ export function graphToReactFlowNodes(graph: CEngineeringGraphLike): Node[] {
     if (graph.conflicts) {
       for (const c of valuesOf<any>(graph.conflicts)) {
         try {
-          if (c.kind?.value !== ConflictKind.FeedMediumMismatch) continue;
+          // Highlight feed-medium mismatches and cycle-detected conflicts
+          if (
+            c.kind?.value !== ConflictKind.FeedMediumMismatch &&
+            c.kind?.value !== ConflictKind.CycleDetected
+          )
+            continue;
           // Only consider open conflicts for highlighting
           if ((c.status?.value ?? "open") !== "open") continue;
           for (const ref of c.entityRefs?.values ? c.entityRefs.values() : []) conflictIds.add(String(ref));
@@ -276,7 +281,11 @@ export function graphToReactFlowEdges(graph: CEngineeringGraphLike): Edge[] {
       if (graph.conflicts) {
         for (const c of valuesOf<any>(graph.conflicts)) {
           try {
-            if (c.kind?.value !== ConflictKind.FeedMediumMismatch) continue;
+            if (
+              c.kind?.value !== ConflictKind.FeedMediumMismatch &&
+              c.kind?.value !== ConflictKind.CycleDetected
+            )
+              continue;
             if ((c.status?.value ?? "open") !== "open") continue;
             for (const ref of c.entityRefs?.values ? c.entityRefs.values() : []) conflictIds.add(String(ref));
           } catch {}

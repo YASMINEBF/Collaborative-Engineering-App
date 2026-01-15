@@ -2,6 +2,7 @@ import type { CRuntime } from "@collabs/collabs";
 import type CEngineeringGraph from "../model/CEngineeringGraph";
 import { resolveUniqueNames } from "./resolveUniqueNames";
 import resolveFeedMediumConflicts from "./resolveFeedMediumConflicts";
+import resolveHasPartCycles from "./resolveHasPartCycles";
 
 type ResolverOptions = {
   debounceMs?: number;
@@ -43,6 +44,9 @@ export function startConflictResolver(
           resolveUniqueNames(graph, currentUserId);
           try {
             resolveFeedMediumConflicts(graph as any, currentUserId);
+          } catch (e) {}
+          try {
+            resolveHasPartCycles(graph as any, currentUserId);
           } catch (e) {}
         } catch (e) {
           // swallow resolver errors
