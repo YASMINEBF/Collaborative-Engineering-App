@@ -4,6 +4,7 @@ import { useCollab } from "../../collabs/provider/CollabProvider";
 import AttributeRow from "./AttributeRow";
 import { equipmentAttributes, portAttributes, capacityUnitOptionsFor } from "./attributeSchema";
 import { validateAndNotifyIfBlocked } from "../../collabs/semantics/mediaChangeValidator";
+import resolveFeedMediumConflicts from "../../collabs/semantics/resolveFeedMediumConflicts";
 import "../styles/attributesSidebar.css";
 
 type Props = {
@@ -19,7 +20,7 @@ export default function AttributesSidebar({
   isReadOnly = false,
   lockedBy,
 }: Props) {
-  const { status, graph, doc } = useCollab();
+  const { status, graph, doc, userId } = useCollab();
   const [, setTick] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(true);
 
@@ -59,8 +60,19 @@ export default function AttributesSidebar({
     }
 
     const field = (selectedComponent as any)[key];
-    if (field?.value !== undefined) field.value = value;
-  }, [selectedComponent]);
+    if (field?.value !== undefined) {
+      field.value = value;
+
+      // After applying a medium change, run the feed-medium conflict resolver
+      // immediately so any open conflict can be marked resolved when the
+      // source/target become compatible again.
+      if ((key === "inputMedium" || key === "outputMedium") && (selectedComponent as any).type?.value === "equipment") {
+        try {
+          resolveFeedMediumConflicts(graph as any, userId ?? "system");
+        } catch (e) {}
+      }
+    }
+  }, [selectedComponent, graph, userId]);
 
   if (!selectedComponent) return null;
 

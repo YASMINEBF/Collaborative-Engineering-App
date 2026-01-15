@@ -3,6 +3,7 @@ import type { Edge, Node } from "reactflow";
 import { MarkerType } from "reactflow";
 import { LogicalKind, type RelationshipKind } from "../models/relationships/enums/RelationshipTypes";
 import type { Medium } from "../models/attributes/enums/Medium";
+import { ConflictKind } from "../collabs/model/enums/ConflictEnum";
 
 /**
  * Minimal "Collabs-like variable" shape:
@@ -55,6 +56,7 @@ export type CRelationshipLike = {
 export type CEngineeringGraphLike = {
   components: any;
   relationships?: any;
+  conflicts?: any;
 };
 
 /**
@@ -206,12 +208,32 @@ export function graphToReactFlowNodes(graph: CEngineeringGraphLike): Node[] {
   const nodes: Node[] = [];
   if (!graph) return nodes;
 
+  // Gather conflict entity refs for feed-medium mismatches
+  const conflictIds = new Set<string>();
+  try {
+    if (graph.conflicts) {
+      for (const c of valuesOf<any>(graph.conflicts)) {
+        try {
+          if (c.kind?.value !== ConflictKind.FeedMediumMismatch) continue;
+          // Only consider open conflicts for highlighting
+          if ((c.status?.value ?? "open") !== "open") continue;
+          for (const ref of c.entityRefs?.values ? c.entityRefs.values() : []) conflictIds.add(String(ref));
+        } catch {}
+      }
+    }
+  } catch {}
+
   for (const c of valuesOf<CComponentLike>(graph.components)) {
     const node = cComponentToReactFlowNode(c);
     if (node) nodes.push(node);
   }
 
-  return nodes;
+  // Apply conflict className to nodes whose id is referenced by a FeedMediumMismatch
+  return nodes.map((n) => ({
+    ...n,
+    className: conflictIds.has(n.id) ? `${n.className ?? ""} node-conflict`.trim() : n.className,
+    data: { ...(n.data ?? {}), conflict: conflictIds.has(n.id) },
+  }));
 }
 
 /**
@@ -247,6 +269,31 @@ export function graphToReactFlowEdges(graph: CEngineeringGraphLike): Edge[] {
 
     edges.push(edge);
   }
+
+  // Post-process edges to mark conflicts based on graph.conflicts
+    try {
+      const conflictIds = new Set<string>();
+      if (graph.conflicts) {
+        for (const c of valuesOf<any>(graph.conflicts)) {
+          try {
+            if (c.kind?.value !== ConflictKind.FeedMediumMismatch) continue;
+            if ((c.status?.value ?? "open") !== "open") continue;
+            for (const ref of c.entityRefs?.values ? c.entityRefs.values() : []) conflictIds.add(String(ref));
+          } catch {}
+        }
+      }
+
+      return edges.map((e) => ({
+        ...e,
+        className: conflictIds.has(e.id) ? `${e.className ?? ""} conflict`.trim() : e.className,
+        data: { ...(e.data ?? {}), conflict: conflictIds.has(e.id) },
+        labelStyle: conflictIds.has(e.id)
+          ? { ...(e.labelStyle ?? {}), fill: "#a00" }
+          : e.labelStyle,
+      }));
+    } catch (e) {
+      return edges;
+    }
 
   return edges;
 }

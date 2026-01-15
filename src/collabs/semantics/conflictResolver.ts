@@ -1,6 +1,7 @@
 import type { CRuntime } from "@collabs/collabs";
 import type CEngineeringGraph from "../model/CEngineeringGraph";
 import { resolveUniqueNames } from "./resolveUniqueNames";
+import resolveFeedMediumConflicts from "./resolveFeedMediumConflicts";
 
 type ResolverOptions = {
   debounceMs?: number;
@@ -40,6 +41,9 @@ export function startConflictResolver(
       setTimeout(() => {
         try {
           resolveUniqueNames(graph, currentUserId);
+          try {
+            resolveFeedMediumConflicts(graph as any, currentUserId);
+          } catch (e) {}
         } catch (e) {
           // swallow resolver errors
           console.warn("conflictResolver: resolveUniqueNames failed", e);

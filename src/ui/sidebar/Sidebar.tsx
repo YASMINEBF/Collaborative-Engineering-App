@@ -1,5 +1,6 @@
 // src/ui/editor/Sidebar.tsx
 import React from "react";
+import FileImportExport from "./FileImportExport";
 
 type PaletteType = "equipment" | "port";
 
@@ -35,7 +36,9 @@ export default function Sidebar() {
       }}
     >
       <h3 style={{ margin: 0 }}>Components</h3>
-
+<div style={{ position: "absolute", left: 12, bottom: 20, zIndex: 100 }}>
+  <FileImportExport />
+</div>
       <div
         draggable
         onDragStart={(e) => onDragStart(e, "equipment")}

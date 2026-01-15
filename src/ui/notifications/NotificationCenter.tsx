@@ -61,26 +61,52 @@ export function NotificationCenter() {
       try {
         for (const conf of graph.conflicts.values()) {
           try {
-            if (conf.kind?.value !== ConflictKind.DuplicateName) continue;
+            const kind = conf.kind?.value;
             const createdAt = conf.createdAt?.value ?? 0;
             const status = conf.status?.value ?? "open";
-            if (status !== "resolved") continue;
-            if (createdAt <= lastSeen) continue;
 
-            const losing = (conf.losingValues?.value as any) ?? [];
-            for (const lv of losing) {
-              const id = lv.id ?? lv["id"] ?? "?";
-              const oldName = lv.oldName ?? lv["oldName"] ?? "";
-              const newName = lv.newName ?? lv["newName"] ?? "";
-              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-              const title = "Name conflict resolved";
-              const message = `"${oldName}" → "${newName}" (id: ${id})`;
-              const n = { id: idn, title, message, ts: Date.now() };
-              setItems((s) => [n, ...s].slice(0, 6));
-              setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 6000);
+            // Resolved duplicate-name notifications (existing behavior)
+            if (kind === ConflictKind.DuplicateName) {
+              if (status !== "resolved") continue;
+              if (createdAt <= lastSeen) continue;
+
+              const losing = (conf.losingValues?.value as any) ?? [];
+              for (const lv of losing) {
+                const id = lv.id ?? lv["id"] ?? "?";
+                const oldName = lv.oldName ?? lv["oldName"] ?? "";
+                const newName = lv.newName ?? lv["newName"] ?? "";
+                const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                const title = "Name conflict resolved";
+                const message = `"${oldName}" → "${newName}" (id: ${id})`;
+                const n = { id: idn, title, message, ts: Date.now() };
+                setItems((s) => [n, ...s].slice(0, 6));
+                setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 6000);
+              }
+
+              lastSeen = Math.max(lastSeen, createdAt);
+              continue;
             }
 
-            lastSeen = Math.max(lastSeen, createdAt);
+            // Feed medium mismatch: notify when open and new
+            if (kind === ConflictKind.FeedMediumMismatch) {
+              if (status !== "open") continue;
+              if (createdAt <= lastSeen) continue;
+
+              const meta = conf.winningValue?.value ?? {};
+              const srcOut = meta.srcOut ?? null;
+              const tgtIn = meta.tgtIn ?? null;
+              const createdBy = conf.createdBy?.value ?? "unknown";
+
+              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+              const title = "Feed medium conflict";
+              const message = `Feeds relationship conflict (${conf.entityRefs?.values ? Array.from(conf.entityRefs.values()).join(",") : "entities"}) — source:${String(srcOut)} target:${String(tgtIn)} (reported by ${createdBy})`;
+              const n = { id: idn, title, message, ts: Date.now() };
+              setItems((s) => [n, ...s].slice(0, 6));
+              setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 8000);
+
+              lastSeen = Math.max(lastSeen, createdAt);
+              continue;
+            }
           } catch {}
         }
       } catch (e) {
