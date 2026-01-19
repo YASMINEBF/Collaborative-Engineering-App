@@ -27,6 +27,7 @@ export const defaultUnitOptions: EnumOption[] = [
 
 export const equipmentAttributes: AttrDef[] = [
   { key: "uniqueName", label: "Name", kind: "text" },
+  { key: "description", label: "Description", kind: "text" },
   { key: "width", label: "Width", kind: "unit", unitOptions: defaultUnitOptions },
   { key: "height", label: "Height", kind: "unit", unitOptions: defaultUnitOptions },
   { key: "color", label: "Color", kind: "enum", options: enumOptionsFrom(Color) },
@@ -36,6 +37,7 @@ export const equipmentAttributes: AttrDef[] = [
 
 export const portAttributes: AttrDef[] = [
   { key: "uniqueName", label: "Name", kind: "text" },
+  { key: "description", label: "Description", kind: "text" },
   { key: "portType", label: "Port Type", kind: "enum", options: enumOptionsFrom(PortType) },
   { key: "capacity", label: "Capacity", kind: "unit", unitOptions: defaultUnitOptions },
   { key: "medium", label: "Medium", kind: "enum", options: enumOptionsFrom(Medium) },

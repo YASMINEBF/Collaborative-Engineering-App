@@ -227,6 +227,28 @@
   min-width: 0;
 }
 
+/* Auto-resizing textarea used for description and other long text */
+.attr-textarea {
+  width: 100%;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #fff;
+  color: #212529;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 40px;
+  resize: none;
+  overflow: hidden;
+}
+
+.attr-textarea:focus {
+  outline: none;
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+}
+
 .attr-input:focus,
 .attr-select:focus {
   outline: none;

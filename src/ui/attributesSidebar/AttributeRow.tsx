@@ -27,11 +27,22 @@ export default function AttributeRow({
 
       <div className="attr-control">
         {def.kind === "text" && (
-          <input
-            className="attr-input"
+          <textarea
+            ref={(el) => {
+              if (!el) return;
+              // adjust immediately for initial content
+              el.style.height = "auto";
+              el.style.height = `${el.scrollHeight}px`;
+            }}
+            className="attr-textarea"
             value={value ?? ""}
             disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
+            onInput={(e) => {
+              const t = e.currentTarget as HTMLTextAreaElement;
+              t.style.height = "auto";
+              t.style.height = `${t.scrollHeight}px`;
+            }}
           />
         )}
 

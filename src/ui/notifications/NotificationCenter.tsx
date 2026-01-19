@@ -19,6 +19,10 @@ export function NotificationCenter() {
     function onEvent(e: any) {
       const d = e.detail;
       if (!d) return;
+      try {
+        // eslint-disable-next-line no-console
+        console.info("NotificationCenter: received ce:notification event", d);
+      } catch (e) {}
       // Support different notification event shapes. Existing callers emit
       // `{ type: 'rename', oldName, newName, affectedId }`. We also accept
       // `{ type: 'notify', title, message }` for arbitrary UI notifications.
@@ -140,6 +144,35 @@ export function NotificationCenter() {
               lastSeen = Math.max(lastSeen, createdAt);
               continue;
             }
+            // Semantically-related attributes (value+unit, width+height, name+description)
+            if (kind === ConflictKind.SemanticallyRelatedAttributes) {
+              if (status !== "open") continue;
+
+              const refs = conf.entityRefs?.values ? Array.from(conf.entityRefs.values()) : [];
+              // Build signature for dedupe: kind + sorted refs + maybe key
+              let keyHint = "";
+              try {
+                keyHint = conf.winningValue?.value?.key ?? conf.losingValues?.value?.[0]?.key ?? "";
+              } catch (e) {}
+              const sig = `${kind}:${refs.map(String).sort().join(",")}:${String(keyHint)}`;
+              if (notified.has(sig)) {
+                lastSeen = Math.max(lastSeen, createdAt);
+                continue;
+              }
+
+              notified.add(sig);
+
+              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+              const title = "Semantic attribute conflict";
+              const message = `Conflicting attribute values for component(s): ${refs.join(",")} — open for manual resolution`;
+              const n = { id: idn, title, message, ts: Date.now() };
+              setItems((s) => [n, ...s].slice(0, 6));
+              setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 8000);
+
+              lastSeen = Math.max(lastSeen, createdAt);
+              continue;
+            }
+            
           } catch {}
         }
       } catch (e) {

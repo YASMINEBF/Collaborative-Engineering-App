@@ -4,6 +4,7 @@ export enum ConflictKind {
   DanglingReference = "danglingReference",
   CycleDetected = "cycleDetected",
   FeedMediumMismatch = "feedMediumMismatch",
+  SemanticallyRelatedAttributes = "semanticallyRelatedAttributes",
 }
 
 export default {

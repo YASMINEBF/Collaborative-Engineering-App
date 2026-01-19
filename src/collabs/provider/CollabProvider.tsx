@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createLocalDoc } from "./docSetup";
 import startConflictResolver from "../semantics/conflictResolver";
+import { applyMVRegisterResolution } from "../semantics/resolveMVRegisterConflicts";
 
 export type CollabStatus = "loading" | "ready" | "error";
 
@@ -19,6 +20,9 @@ export type CollabContextType = {
   // Network connection state
   isConnected?: boolean;
   userId?: string;
+  // MV helpers for UI: list candidates and apply resolution
+  getMVRegisterCandidates?: (compId: string, key?: string) => any[];
+  resolveMVRegister?: (compId: string, chosenValue: any) => boolean;
 };
 
 const CollabContext = createContext<CollabContextType>({
@@ -89,6 +93,30 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
           localUserId = `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         }
 
+        // MV helper wrappers capture the current graph and localUserId
+        const getMVRegisterCandidates = (compId: string, key?: string) => {
+          try {
+            const g = (setup as any).graph;
+            const comp = g?.components?.get?.(compId);
+            if (!comp) return [];
+            const dimsMap = (comp as any)?.dimensions;
+            if (!dimsMap || typeof dimsMap.getConflicts !== "function") return [];
+            const k = key ?? (comp as any).dimsKey ? (comp as any).dimsKey() : "_dims";
+            return dimsMap.getConflicts(k) ?? [];
+          } catch (e) {
+            return [];
+          }
+        };
+
+        const resolveMVRegister = (compId: string, chosenValue: any) => {
+          try {
+            const g = (setup as any).graph;
+            return applyMVRegisterResolution(g, compId, chosenValue, localUserId ?? "system");
+          } catch (e) {
+            return false;
+          }
+        };
+
         setState({
           status: "ready",
           doc: setup.doc,
@@ -96,7 +124,16 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
           provider: providerObj,
           isConnected: connectedRef.current,
           userId: localUserId,
+          getMVRegisterCandidates,
+          resolveMVRegister,
         });
+
+        // Temporary dev helper: expose the collab graph for console inspection
+        try {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          window.__CE_GRAPH__ = setup.graph;
+        } catch (e) {}
 
         // Start a separate conflict resolver service which debounces and defers
         // calls to `resolveUniqueNames`. This keeps the provider lightweight and

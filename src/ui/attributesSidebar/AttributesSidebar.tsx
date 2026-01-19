@@ -61,7 +61,58 @@ export default function AttributesSidebar({
 
     const field = (selectedComponent as any)[key];
     if (field?.value !== undefined) {
+      // If this attribute has a companion unit CVar, update both CVar and
+      // also attempt to write a full {value, unit} pair into any MV-register
+      // present on the component so resolvers can compare pairs.
+      const companionUnit = (selectedComponent as any)[`${key}Unit`];
+      const currentUnit = companionUnit && typeof companionUnit === "object" ? companionUnit.value : undefined;
+
       field.value = value;
+
+      // Find an MV-like map on the component (CValueMap / CMultiValueMap)
+      try {
+        const compObj: any = selectedComponent as any;
+        for (const p of Object.keys(compObj)) {
+          try {
+            const maybeMap = compObj[p];
+            if (!maybeMap) continue;
+            if (typeof maybeMap.getConflicts === "function" && typeof maybeMap.set === "function") {
+              // Special-case width/height pair -> write to `_dims` key with both values
+              if (key === "width" || key === "height") {
+                const widthField = (selectedComponent as any)["width"];
+                const heightField = (selectedComponent as any)["height"];
+                const w = key === "width" ? value : widthField && typeof widthField === "object" ? widthField.value : undefined;
+                const h = key === "height" ? value : heightField && typeof heightField === "object" ? heightField.value : undefined;
+                const mapKey = "_dims";
+                try {
+                  maybeMap.set(mapKey, { width: w, height: h, unit: currentUnit });
+                } catch (e) {}
+                break;
+              }
+
+              // Special-case name/description pair -> write to `_nameDesc` key
+              if (key === "uniqueName" || key === "description" || key === "name") {
+                const nameField = (selectedComponent as any)["uniqueName"] || (selectedComponent as any)["name"];
+                const descField = (selectedComponent as any)["description"];
+                const n = key === "uniqueName" || key === "name" ? value : nameField && typeof nameField === "object" ? nameField.value : undefined;
+                const d = key === "description" ? value : descField && typeof descField === "object" ? descField.value : undefined;
+                const mapKey = "_nameDesc";
+                try {
+                  maybeMap.set(mapKey, { name: n, description: d });
+                } catch (e) {}
+                break;
+              }
+
+              // Default: per-attribute value+unit key
+              const mapKey = typeof maybeMap.get === "function" ? `_valueUnit:${key}` : key;
+              try {
+                maybeMap.set(mapKey, { value, unit: currentUnit });
+              } catch (e) {}
+              break;
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
 
       // After applying a medium change, run the feed-medium conflict resolver
       // immediately so any open conflict can be marked resolved when the
@@ -134,7 +185,30 @@ export default function AttributesSidebar({
 
               const onUnitChange = defForRow.kind === "unit" ? (newUnit: string) => {
                 const u = (selectedComponent as any)[`${def.key}Unit`];
-                if (u && typeof u === "object" && "value" in u) u.value = newUnit;
+                if (u && typeof u === "object" && "value" in u) {
+                  // Update unit CVar
+                  u.value = newUnit;
+
+                  // Also attempt to write full pair into any MV-register on the component
+                  try {
+                    const compObj: any = selectedComponent as any;
+                    const valueField = (selectedComponent as any)[def.key];
+                    const currentValue = valueField && typeof valueField === "object" ? valueField.value : undefined;
+                    for (const p of Object.keys(compObj)) {
+                      try {
+                        const maybeMap = compObj[p];
+                        if (!maybeMap) continue;
+                        if (typeof maybeMap.getConflicts === "function" && typeof maybeMap.set === "function") {
+                          const mapKey = typeof maybeMap.get === "function" ? `_valueUnit:${def.key}` : def.key;
+                          try {
+                            maybeMap.set(mapKey, { value: currentValue, unit: newUnit });
+                          } catch (e) {}
+                          break;
+                        }
+                      } catch (e) {}
+                    }
+                  } catch (e) {}
+                }
               } : undefined;
 
               return (
