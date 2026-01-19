@@ -55,6 +55,14 @@
   stroke-width: 4;
 }
 
+/* Ensure structural hasPart edges show red conflict styling as well */
+.edge-haspart.conflict {
+  color: #b71c1c !important;
+}
+.edge-haspart.conflict .react-flow__edge-path {
+  stroke-width: 4;
+}
+
 /* =========================
    Hover feedback
    ========================= */

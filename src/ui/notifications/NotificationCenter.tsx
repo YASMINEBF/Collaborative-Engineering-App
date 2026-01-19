@@ -55,6 +55,10 @@ export function NotificationCenter() {
     if (!graph || !doc) return;
 
     let lastSeen = Date.now() - 1000;
+    // Track which conflict signatures we've already notified about to avoid
+    // duplicate notifications when multiple conflict entries are created
+    // concurrently across replicas. Signature = kind + sorted(entityRefs).
+    const notified = new Set<string>();
 
     // Helper to scan existing conflicts for recent resolved duplicate-name entries
     const scanConflicts = () => {
@@ -115,6 +119,17 @@ export function NotificationCenter() {
 
               const createdBy = conf.createdBy?.value ?? "unknown";
               const refs = conf.entityRefs?.values ? Array.from(conf.entityRefs.values()) : [];
+
+              // Build signature to dedupe: kind + sorted refs
+              const sig = `${kind}:${refs.map(String).sort().join(",")}`;
+              if (notified.has(sig)) {
+                // already notified for this set of relationships
+                lastSeen = Math.max(lastSeen, createdAt);
+                continue;
+              }
+
+              notified.add(sig);
+
               const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
               const title = "Cycle detected (hasPart)";
               const message = `Cycle detected among relationships: ${refs.join(",")} (reported by ${createdBy})`;

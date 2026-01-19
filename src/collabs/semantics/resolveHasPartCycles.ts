@@ -33,39 +33,59 @@ export function resolveHasPartCycles(graph: CEngineeringGraph, currentUserId = "
       } catch (e) {}
     }
 
-    // Detect cycles using DFS; collect sets of relationship ids involved in cycles
+    // Detect cycles using DFS; collect directed cycles and the relationship ids
+    // that participate in each cycle. We maintain parent pointers so when a
+    // back-edge is discovered we can walk the stack and collect the exact
+    // sequence of edges forming the cycle.
     const visited = new Set<string>();
-    const stack = new Set<string>();
-    const inPathRel: Array<string> = [];
+    const inStack = new Set<string>();
+    const parentNode = new Map<string, string | null>();
+    const parentEdge = new Map<string, string | null>();
     const cycles: Array<Set<string>> = [];
 
-    function dfs(node: string) {
-      if (stack.has(node)) return; // already in current path
-      if (visited.has(node)) return;
-      visited.add(node);
-      stack.add(node);
+    function dfs(u: string) {
+      visited.add(u);
+      inStack.add(u);
 
-      const edges = adj.get(node) ?? [];
+      const edges = adj.get(u) ?? [];
       for (const e of edges) {
-        if (stack.has(e.tgt)) {
-          // Found a back-edge: gather the cycle edges between e.tgt -> ... -> node -> e.tgt
+        const v = e.tgt;
+        // If v is on the current recursion stack, we've found a back-edge
+        if (inStack.has(v)) {
+          // collect edges from u -> v (current edge) plus edges along the
+          // parent chain from u back to v
           const cycleSet = new Set<string>();
-          // include current edge
           cycleSet.add(e.relId);
-          // Walk rels we've seen to collect connecting edges on the stack
-          for (const r of rels) {
-            if (r.src === e.tgt && r.tgt === node) cycleSet.add(r.id);
+
+          // Walk from u back to v using parentNode/parentEdge
+          let cur: string | null = u;
+          while (cur && cur !== v) {
+            const pe = parentEdge.get(cur);
+            if (pe) cycleSet.add(pe);
+            cur = parentNode.get(cur) ?? null;
           }
+
           cycles.push(cycleSet);
-        } else if (!visited.has(e.tgt)) {
-          dfs(e.tgt);
+          continue;
+        }
+
+        if (!visited.has(v)) {
+          parentNode.set(v, u);
+          parentEdge.set(v, e.relId);
+          dfs(v);
         }
       }
 
-      stack.delete(node);
+      inStack.delete(u);
     }
 
-    for (const [n] of adj) dfs(n);
+    for (const n of adj.keys()) {
+      if (!visited.has(n)) {
+        parentNode.set(n, null);
+        parentEdge.set(n, null);
+        dfs(n);
+      }
+    }
 
     // For each detected cycle, create a conflict record unless one already exists
     for (const cycleSet of cycles) {

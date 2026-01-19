@@ -292,6 +292,14 @@ export function graphToReactFlowEdges(graph: CEngineeringGraphLike): Edge[] {
         }
       }
 
+      // Debug: log conflict ids and edge ids to help diagnose missing highlights
+      try {
+        // eslint-disable-next-line no-console
+        console.debug("[reactFlowAdapter] conflictIds:", Array.from(conflictIds));
+        // eslint-disable-next-line no-console
+        console.debug("[reactFlowAdapter] edges:", edges.map((x) => x.id));
+      } catch (e) {}
+
       return edges.map((e) => ({
         ...e,
         className: conflictIds.has(e.id) ? `${e.className ?? ""} conflict`.trim() : e.className,
