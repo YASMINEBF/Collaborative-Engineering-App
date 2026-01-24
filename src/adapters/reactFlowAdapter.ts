@@ -247,10 +247,34 @@ export function graphToReactFlowNodes(graph: CEngineeringGraphLike): Node[] {
 export function graphToReactFlowEdges(graph: CEngineeringGraphLike): Edge[] {
   const edges: Edge[] = [];
   if (!graph || !graph.relationships) return edges;
+  // Debug: log raw relationship entries to help diagnose missing edges
+  try {
+    const rawRels: string[] = [];
+    for (const rr of valuesOf<any>(graph.relationships)) {
+      try {
+        const rid = String((rr as any)?.id?.value ?? (rr as any)?.id ?? "").trim();
+        const rs = String((rr as any)?.sourceId?.value ?? (rr as any)?.sourceId ?? "").trim();
+        const rt = String((rr as any)?.targetId?.value ?? (rr as any)?.targetId ?? "").trim();
+const rk = String((rr as any)?.kind?.value ?? (rr as any)?.kind ?? "").trim();
+rawRels.push(`${rid} (${rk}) -> ${rs} -> ${rt}`);
+      } catch (e) {}
+    }
+    // eslint-disable-next-line no-console
+    console.debug("[reactFlowAdapter] raw relationships:", rawRels);
+  } catch (e) {}
 
   for (const r of valuesOf<CRelationshipLike>(graph.relationships)) {
     const edge = cRelationshipToReactFlowEdge(r);
     if (!edge) continue;
+
+    // Debug: log relationship conversion details
+    try {
+      const rid = String((r as any)?.id?.value ?? (r as any)?.id ?? "");
+      const rs = String((r as any)?.sourceId?.value ?? (r as any)?.sourceId ?? "");
+      const rt = String((r as any)?.targetId?.value ?? (r as any)?.targetId ?? "");
+      // eslint-disable-next-line no-console
+      console.debug("[reactFlowAdapter] converting rel:", rid, rs, rt);
+    } catch (e) {}
 
     // If feeds edge has no explicit medium, try to derive from components
     if ((edge.className || "").includes("feeds") && !edge.data?.medium) {

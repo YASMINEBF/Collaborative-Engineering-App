@@ -1,6 +1,6 @@
 import * as collabs from "@collabs/collabs";
-import type { RelationshipKind } from "../models/relationships/enums/RelationshipTypes";
-import { Medium } from "../models/attributes/enums/Medium";
+import type { RelationshipKind } from "../../models/relationships/enums/RelationshipTypes";
+import { Medium } from "../../models/attributes/enums/Medium";
 
 export type RelId = string;
 

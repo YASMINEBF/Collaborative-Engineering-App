@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import "./notification.css";
 import { useCollab } from "../../collabs/provider/CollabProvider";
 import { ConflictKind } from "../../collabs/model/enums/ConflictEnum";
@@ -13,6 +13,12 @@ type Notification = {
 export function NotificationCenter() {
   const [items, setItems] = useState<Notification[]>([]);
   const { doc, graph } = useCollab();
+
+  // Keep a map of notification signatures -> timestamp to dedupe repeated
+  // notifications originating from events or CRDT conflict scans. Entries
+  // older than NOTIF_TTL_MS are considered expired and can be re-notified.
+  const NOTIF_TTL_MS = 60_000; // 60s
+  const notifiedRef = useRef<Map<string, number>>(new Map());
 
   // Listen for window-dispatched events (fallback / other UI code)
   useEffect(() => {
@@ -31,7 +37,15 @@ export function NotificationCenter() {
         const title = "Name conflict resolved";
         const message = `"${d.oldName}" → "${d.newName}" (id: ${d.affectedId})`;
         const n = { id, title, message, ts: Date.now() };
-        setItems((s) => [n, ...s].slice(0, 6));
+        // Deduplicate by event signature
+        const sig = `event:rename:${d.affectedId}:${d.oldName}:${d.newName}`;
+        const now = Date.now();
+        // cleanup expired
+        for (const [k, t] of notifiedRef.current.entries()) if (now - t > NOTIF_TTL_MS) notifiedRef.current.delete(k);
+        if (!notifiedRef.current.has(sig)) {
+          notifiedRef.current.set(sig, now);
+          setItems((s) => [n, ...s].slice(0, 6));
+        }
 
         // Auto-remove after 6s
         setTimeout(() => {
@@ -42,11 +56,19 @@ export function NotificationCenter() {
         const title = d.title ?? "Notification";
         const message = d.message ?? "";
         const n = { id, title, message, ts: Date.now() };
-        setItems((s) => [n, ...s].slice(0, 6));
 
-        setTimeout(() => {
-          setItems((s) => s.filter((x) => x.id !== id));
-        }, 6000);
+        // Build an event signature to dedupe similar notify events
+        const sig = `event:notify:${d.compId ?? ""}:${d.key ?? ""}:${title}:${message}`;
+        const now = Date.now();
+        for (const [k, t] of notifiedRef.current.entries()) if (now - t > NOTIF_TTL_MS) notifiedRef.current.delete(k);
+        if (!notifiedRef.current.has(sig)) {
+          notifiedRef.current.set(sig, now);
+          setItems((s) => [n, ...s].slice(0, 6));
+
+          setTimeout(() => {
+            setItems((s) => s.filter((x) => x.id !== id));
+          }, 6000);
+        }
       }
     }
 
@@ -59,19 +81,40 @@ export function NotificationCenter() {
     if (!graph || !doc) return;
 
     let lastSeen = Date.now() - 1000;
-    // Track which conflict signatures we've already notified about to avoid
-    // duplicate notifications when multiple conflict entries are created
-    // concurrently across replicas. Signature = kind + sorted(entityRefs).
-    const notified = new Set<string>();
+    // Use a shared notified map (kept in ref) to avoid duplicate toasts between
+    // the event handler above and this CRDT scanning loop. Values older than
+    // NOTIF_TTL_MS are expired and can be re-notified.
+    const now = Date.now();
+    for (const [k, t] of notifiedRef.current.entries()) if (now - t > NOTIF_TTL_MS) notifiedRef.current.delete(k);
 
     // Helper to scan existing conflicts for recent resolved duplicate-name entries
     const scanConflicts = () => {
       try {
-        for (const conf of graph.conflicts.values()) {
+        // Iterate entries so we can dedupe by the conflict id (avoid showing
+        // the same conflict twice when it arrives via event + CRDT scan).
+        const entries: Array<[string, any]> = [];
+        try {
+          if (typeof graph.conflicts.entries === "function") {
+            for (const [k, v] of graph.conflicts.entries()) entries.push([String(k), v]);
+          } else if (typeof graph.conflicts.forEach === "function") {
+            graph.conflicts.forEach((v: any, k: any) => entries.push([String(k), v]));
+          }
+        } catch (e) {}
+
+        for (const [confId, conf] of entries) {
           try {
             const kind = conf.kind?.value;
             const createdAt = conf.createdAt?.value ?? 0;
             const status = conf.status?.value ?? "open";
+
+            // Dedupe by conflict id first: if we've already notified for
+            // this conflict id, skip producing another toast.
+            const confKey = `conf:${confId}`;
+            if (notifiedRef.current.has(confKey)) {
+              // Update lastSeen to avoid re-notifying on createdAt
+              lastSeen = Math.max(lastSeen, createdAt);
+              continue;
+            }
 
             // Resolved duplicate-name notifications (existing behavior)
             if (kind === ConflictKind.DuplicateName) {
@@ -126,13 +169,13 @@ export function NotificationCenter() {
 
               // Build signature to dedupe: kind + sorted refs
               const sig = `${kind}:${refs.map(String).sort().join(",")}`;
-              if (notified.has(sig)) {
-                // already notified for this set of relationships
+              const now = Date.now();
+              if (notifiedRef.current.has(sig)) {
                 lastSeen = Math.max(lastSeen, createdAt);
                 continue;
               }
-
-              notified.add(sig);
+              notifiedRef.current.set(sig, now);
+              notifiedRef.current.set(confKey, now);
 
               const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
               const title = "Cycle detected (hasPart)";
@@ -155,12 +198,13 @@ export function NotificationCenter() {
                 keyHint = conf.winningValue?.value?.key ?? conf.losingValues?.value?.[0]?.key ?? "";
               } catch (e) {}
               const sig = `${kind}:${refs.map(String).sort().join(",")}:${String(keyHint)}`;
-              if (notified.has(sig)) {
+              const now2 = Date.now();
+              if (notifiedRef.current.has(sig)) {
                 lastSeen = Math.max(lastSeen, createdAt);
                 continue;
               }
-
-              notified.add(sig);
+              notifiedRef.current.set(sig, now2);
+              notifiedRef.current.set(confKey, now2);
 
               const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
               const title = "Semantic attribute conflict";
@@ -168,6 +212,51 @@ export function NotificationCenter() {
               const n = { id: idn, title, message, ts: Date.now() };
               setItems((s) => [n, ...s].slice(0, 6));
               setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 8000);
+
+              lastSeen = Math.max(lastSeen, createdAt);
+              continue;
+            }
+            // Dangling reference: an edge points to a missing component
+            if (kind === ConflictKind.DanglingReference) {
+              if (status !== "open") continue;
+              if (createdAt <= lastSeen) continue;
+
+              const refs = conf.entityRefs?.values ? Array.from(conf.entityRefs.values()) : [];
+              const rels = refs.filter((r) => !!graph.relationships.get(String(r)));
+
+              // Extract missing ids from losingValues if present
+              const losing = (conf.losingValues?.value as any) ?? [];
+              const missingIds: string[] = [];
+              for (const lv of losing) {
+                try {
+                  if (lv && (lv.missingId || lv.id)) missingIds.push(String(lv.missingId ?? lv.id));
+                } catch {}
+              }
+
+              // If no relationship remains referencing the missing component,
+              // don't notify (the edge was removed locally).
+              if (rels.length === 0) {
+                lastSeen = Math.max(lastSeen, createdAt);
+                continue;
+              }
+
+              const intended = conf.winningValue?.value?.intendedDeletionBy ?? conf.createdBy?.value ?? "unknown";
+
+              const sig = `${kind}:${refs.map(String).sort().join(",")}:${String(intended)}:${missingIds.join(",")}`;
+              const now3 = Date.now();
+              if (notifiedRef.current.has(sig)) {
+                lastSeen = Math.max(lastSeen, createdAt);
+                continue;
+              }
+              notifiedRef.current.set(sig, now3);
+              notifiedRef.current.set(confKey, now3);
+
+              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+              const title = "Dangling reference";
+              const message = `Relationship(s) ${rels.join(",")} reference missing component(s) ${missingIds.join(",")} — intended deletion by ${String(intended)}`;
+              const n = { id: idn, title, message, ts: Date.now() };
+              setItems((s) => [n, ...s].slice(0, 6));
+              setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 10000);
 
               lastSeen = Math.max(lastSeen, createdAt);
               continue;

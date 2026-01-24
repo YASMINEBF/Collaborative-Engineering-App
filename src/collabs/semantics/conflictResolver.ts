@@ -4,6 +4,7 @@ import { resolveUniqueNames } from "./resolveUniqueNames";
 import resolveFeedMediumConflicts from "./resolveFeedMediumConflicts";
 import resolveHasPartCycles from "./resolveHasPartCycles";
 import resolveValueUnitConflicts from "./resolveValueUnitConflicts";
+import resolveDanglingReferences from "./resolveDanglingReferences";
 
 type ResolverOptions = {
   debounceMs?: number;
@@ -51,6 +52,9 @@ export function startConflictResolver(
           } catch (e) {}
             try {
               resolveValueUnitConflicts(graph as any, currentUserId);
+            } catch (e) {}
+            try {
+              resolveDanglingReferences(graph as any, currentUserId);
             } catch (e) {}
         } catch (e) {
           // swallow resolver errors

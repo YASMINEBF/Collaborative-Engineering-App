@@ -39,7 +39,6 @@ type PendingConnect = {
 function InnerCanvas(props: {
   onDropped: (type: PaletteType, position: { x: number; y: number }) => void;
   onSelectNode: (id: string | null) => void;
-
 }) {
   const { onDropped } = props;
 
@@ -53,6 +52,17 @@ function InnerCanvas(props: {
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const reactFlow = useReactFlow();
+
+  /**
+   * ReactFlow (your version) fires onEdgesDelete BEFORE onNodesDelete when deleting a node.
+   * We therefore set this flag as early as possible (keydown capture) so onEdgesDelete can ignore
+   * those edge deletions, and deleteComponent can still read the incoming hasPart edge to compute
+   * the grandparent.
+   */
+  const deletingNodeRef = useRef(false);
+
+  // Track currently selected node ids so we know if Delete/Backspace will delete nodes.
+  const selectedNodeIdsRef = useRef<string[]>([]);
 
   const nodeTypes = useMemo(
     () => ({
@@ -86,11 +96,41 @@ function InnerCanvas(props: {
     [graph, status]
   );
 
+  // ----- Pre-delete flagging (needed because onEdgesDelete can fire first) -----
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+
+      // If any nodes are selected, a delete keypress will likely delete nodes + their edges.
+      if (selectedNodeIdsRef.current.length > 0) {
+        deletingNodeRef.current = true;
+
+        // Release quickly; onNodesDelete also releases in finally.
+        setTimeout(() => {
+          deletingNodeRef.current = false;
+        }, 0);
+      }
+    };
+
+    // Capture phase so we run before ReactFlow handlers.
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, []);
+
   // Delete from Collabs (source of truth).
   const onNodesDelete = useCallback(
     (deleted: Node[]) => {
       if (status !== "ready" || !graph) return;
-      for (const n of deleted) deleteComponent(graph, n.id);
+
+      // Keep flag on during our deleteComponent mutations
+      deletingNodeRef.current = true;
+      try {
+        for (const n of deleted) deleteComponent(graph, n.id);
+      } finally {
+        setTimeout(() => {
+          deletingNodeRef.current = false;
+        }, 0);
+      }
     },
     [graph, status]
   );
@@ -98,6 +138,9 @@ function InnerCanvas(props: {
   // Delete edges from Collabs when removed from the canvas (source of truth).
   const onEdgesDelete = useCallback(
     (deleted: Edge[]) => {
+      // ✅ Ignore edge deletions fired as a side-effect of node deletion
+      if (deletingNodeRef.current) return;
+
       if (status !== "ready" || !graph) return;
       for (const e of deleted) deleteRelationship(graph, e.id);
     },
@@ -122,30 +165,28 @@ function InnerCanvas(props: {
       if (!bounds) return;
 
       const position = reactFlow.screenToFlowPosition({
-      x: e.clientX,
-      y: e.clientY,
-    });
+        x: e.clientX,
+        y: e.clientY,
+      });
 
       onDropped(type, position);
     },
     [onDropped, reactFlow]
   );
 
-  // attributes
-const onSelectionChange = useCallback(
-  ({ nodes }: { nodes: Node[]; edges: Edge[] }) => {
-    props.onSelectNode(nodes.length ? nodes[0].id : null);
-  },
-  [props.onSelectNode]
-);
+  // Selection (also track selected nodes for pre-delete detection)
+  const onSelectionChange = useCallback(
+    ({ nodes }: { nodes: Node[]; edges: Edge[] }) => {
+      selectedNodeIdsRef.current = nodes.map((n) => n.id);
+      props.onSelectNode(nodes.length ? nodes[0].id : null);
+    },
+    [props.onSelectNode]
+  );
 
-
-const onPaneClick = useCallback(() => {
-  props.onSelectNode(null);
-}, [props.onSelectNode]);
-
-
-
+  const onPaneClick = useCallback(() => {
+    selectedNodeIdsRef.current = [];
+    props.onSelectNode(null);
+  }, [props.onSelectNode]);
 
   // ===== Connect → open menu near target =====
 
@@ -160,11 +201,7 @@ const onPaneClick = useCallback(() => {
       const targetNode = reactFlow.getNode(conn.target);
       if (!targetNode) return;
 
-      // Convert target node flow coords -> wrapper screen coords
       const { x: vx, y: vy, zoom } = reactFlow.getViewport();
-
-      // Place menu near the target node (top-right-ish).
-      // This uses node position; if you want exact center, we can refine later using measured size.
       const menuX = targetNode.position.x * zoom + vx + 140;
       const menuY = targetNode.position.y * zoom + vy + 10;
 
@@ -186,7 +223,6 @@ const onPaneClick = useCallback(() => {
 
   const onChooseConnectionType = useCallback(
     (kind: RelationshipKind | "") => {
-      // "" means cancel
       if (!pendingConnect) return;
 
       const { conn } = pendingConnect;
@@ -196,10 +232,6 @@ const onPaneClick = useCallback(() => {
       if (status !== "ready" || !graph) return;
       if (!conn.source || !conn.target) return;
 
-      // Pre-validate Feeds connections client-side so we can show an immediate
-      // small notification instead of attempting creation and relying on
-      // the collab conflict machinery. This mirrors the server-side check in
-      // `createRelationship`.
       if (kind === PhysicalKind.Feeds) {
         try {
           const srcId = String(conn.source);
@@ -214,15 +246,12 @@ const onPaneClick = useCallback(() => {
             window.dispatchEvent(new CustomEvent("ce:notification", { detail: { type: "notify", title, message } }));
             return;
           }
-        } catch (e) {
-          // swallow and continue to attempt creation; the server-side logic will
-          // still catch mismatches and record conflicts as needed.
+        } catch {
+          // ignore and let createRelationship handle conflicts
         }
       }
 
       const id = `rel-${Date.now()}`;
-      // medium = null for now (you can add a second small prompt for feeds later)
-      // preserve the handle ids the user connected to so the edge attaches correctly
       createRelationship(
         graph,
         id,
@@ -249,7 +278,7 @@ const onPaneClick = useCallback(() => {
         height: "100%",
         border: "1px solid #ddd",
         borderRadius: 8,
-        position: "relative", //  needed so menu can be absolutely positioned
+        position: "relative",
       }}
       onDrop={onDrop}
       onDragOver={onDragOver}
@@ -260,7 +289,7 @@ const onPaneClick = useCallback(() => {
         nodeTypes={nodeTypes}
         fitView
         connectionRadius={40}
-        onSelectionChange={onSelectionChange} 
+        onSelectionChange={onSelectionChange}
         onPaneClick={onPaneClick}
         onNodesChange={onNodesChange}
         onNodeDragStop={onNodeDragStop}
@@ -282,7 +311,6 @@ const onPaneClick = useCallback(() => {
         onClose={closeMenu}
       />
 
-      {/* Connection toggle placed bottom-right inside the graph wrapper */}
       <div style={{ position: "absolute", right: 12, bottom: 20, zIndex: 100 }}>
         <ConnectionToggle isConnected={!!isConnected} onToggle={toggleConnection} />
       </div>
@@ -296,10 +324,7 @@ export default function GraphCanvas(props: {
 }) {
   return (
     <ReactFlowProvider>
-      <InnerCanvas
-        onDropped={props.onDropped}
-        onSelectNode={props.onSelectNode}
-      />
+      <InnerCanvas onDropped={props.onDropped} onSelectNode={props.onSelectNode} />
     </ReactFlowProvider>
   );
 }

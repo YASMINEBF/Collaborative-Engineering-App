@@ -4,7 +4,7 @@ import type { ComponentType } from "./ComponentTypes";
 import CEquipment from "./CEquipment";
 import CPort from "./CPort";
 
-import CRelationship from "../CRelationship";
+import CRelationship from "./CRelationship";
 import CConflict from "./CConflict";
 import { ConflictKind } from "./enums/ConflictEnum";
 
@@ -42,6 +42,7 @@ export class CEngineeringGraph extends collabs.CObject {
   // Root indices
   readonly nameIndex: collabs.CValueMap<string, ComponentId>;
   readonly feedsByPortMedium: collabs.CValueMap<string, RelId>;
+  readonly parentByChild: collabs.CValueMap<ComponentId, ComponentId>;
 
   constructor(init: collabs.InitToken) {
     super(init);
@@ -71,7 +72,7 @@ export class CEngineeringGraph extends collabs.CObject {
       new collabs.CMap<RelId, CRelationship, RelationshipSetArgs>(
         i,
         (valueInit, id, type, kind, sourceId, targetId, medium, sourceHandle, targetHandle) => {
-          // ✅ IMPORTANT: do NOT do rel.medium.value = medium here (it sends during receive/load)
+          // IMPORTANT: do NOT do rel.medium.value = medium here (it sends during receive/load)
           return new CRelationship(
             valueInit,
             id,
@@ -102,6 +103,11 @@ export class CEngineeringGraph extends collabs.CObject {
     this.feedsByPortMedium = this.registerCollab(
       "feedsByPortMedium",
       (i) => new collabs.CValueMap<string, RelId>(i)
+    );
+
+    this.parentByChild = this.registerCollab(
+      "parentByChild",
+      (i) => new collabs.CValueMap<ComponentId, ComponentId>(i)
     );
   }
 }

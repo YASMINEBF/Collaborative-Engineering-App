@@ -1,7 +1,9 @@
 // collabs/commands/components.ts
 import type { CEngineeringGraph, ComponentId } from "../model/CEngineeringGraph";
 import type { ComponentType } from "../model/ComponentTypes";
-import { deleteRelationshipsForComponent } from "./relationships";
+import { deleteRelationship, createRelationship } from "./relationships";
+import { StructuralKind } from "../../models/relationships/enums/RelationshipTypes";
+import { ConflictKind } from "../model/enums/ConflictEnum";
 
 /** Keep name handling consistent everywhere. */
 function normalizeName(name: string): string {
@@ -96,17 +98,122 @@ export function setComponentPosition(
 }
 
 /** Delete component + clean up indices (and optionally relationships). */
-export function deleteComponent(graph: CEngineeringGraph, id: ComponentId) {
+export function deleteComponent(graph: CEngineeringGraph, id: ComponentId, deletedBy: string | null = null) {
   const c = graph.components.get(id);
   if (!c) return;
 
-  // 1) delete attached relationships first (referential integrity)
-  deleteRelationshipsForComponent(graph, id);
+  const runtime: any = (graph as any).runtime ?? (graph as any).doc ?? null;
 
-  // 2) clean name index
-  const name = c.uniqueName.value;
-  if (name) graph.nameIndex.delete(name);
+  const doWork = () => {
+    // 1) Find grandparent (parent of deleted node)
+let grandParentId: string | null = null;
 
-  // 3) delete the component
-  graph.components.delete(id);
+// Prefer index if present
+try {
+  grandParentId = graph.parentByChild.get(id) ?? null;
+} catch {
+  grandParentId = null;
+}
+
+// Fallback: derive from incoming hasPart edge parent -> deleted
+if (!grandParentId) {
+  for (const r of graph.relationships.values()) {
+    if (r.kind.value !== StructuralKind.HasPart) continue;
+    if (r.targetId.value === id) {
+      grandParentId = r.sourceId.value;
+      break;
+    }
+  }
+}
+
+console.debug("[reparent] grandParentId for deleted", id, "=", grandParentId);
+
+    // 2) Collect:
+    //    - outgoing HasPart edges: deleted -> child
+    //    - incoming HasPart edges: parent -> deleted  (cleanup!)
+    const outgoing: Array<{ relId: string; childId: string }> = [];
+    const incomingToDeleted: string[] = [];
+
+    for (const r of graph.relationships.values()) {
+      if (r.kind.value !== StructuralKind.HasPart) continue;
+
+      const src = r.sourceId.value;
+      const tgt = r.targetId.value;
+      const relId = r.id.value;
+
+      if (src === id) outgoing.push({ relId, childId: tgt });
+      if (tgt === id) incomingToDeleted.push(relId);
+    }
+
+    // helper: avoid cycles (optional; your version is ok)
+    const hasPath = (fromId: string, toId: string) => {
+      const visited = new Set<string>();
+      const stack = [fromId];
+      while (stack.length) {
+        const cur = stack.pop()!;
+        if (cur === toId) return true;
+        if (visited.has(cur)) continue;
+        visited.add(cur);
+        for (const rr of graph.relationships.values()) {
+          if (rr.kind.value !== StructuralKind.HasPart) continue;
+          if (rr.sourceId.value === cur) stack.push(rr.targetId.value);
+        }
+      }
+      return false;
+    };
+
+    // 3) Reparent children
+    for (const { relId, childId } of outgoing) {
+      // delete old edge deleted->child (also clears parentByChild[child])
+      deleteRelationship(graph, relId as any);
+
+      // create new edge grandParent->child if grandParent exists; else child becomes root
+      if (grandParentId) {
+        if (grandParentId === childId) continue;
+        if (hasPath(childId, grandParentId)) continue; // avoid cycles
+
+        const newRelId = `reparent-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        createRelationship(
+          graph as any,
+          newRelId,
+          StructuralKind.HasPart as any,
+          grandParentId,
+          childId,
+          null,
+          null,
+          null,
+          deletedBy ?? ""
+        );
+         const created = graph.relationships.get(newRelId);
+  console.debug(
+    "[reparent] created?",
+    !!created,
+    "relId=", newRelId,
+    "src=", created?.sourceId?.value,
+    "tgt=", created?.targetId?.value,
+    "kind=", created?.kind?.value
+  );
+
+      }
+    }
+
+    // 4) IMPORTANT: delete incoming parent->deleted hasPart edge(s)
+    for (const relId of incomingToDeleted) {
+      deleteRelationship(graph, relId as any);
+    }
+
+    // 5) Clean name index
+    const name = c.uniqueName.value;
+    if (name) graph.nameIndex.delete(name);
+
+    // 6) Delete the component itself
+    graph.components.delete(id);
+  };
+
+  // Run in one transaction if possible (prevents mid-recompute states)
+  if (runtime && typeof runtime.transact === "function") {
+    runtime.transact(doWork);
+  } else {
+    doWork();
+  }
 }

@@ -8,7 +8,7 @@ import resolveFeedMediumConflicts from "../../collabs/semantics/resolveFeedMediu
 import "../styles/attributesSidebar.css";
 
 type Props = {
-  selectedNodeId: string | null;
+  selectedNodeId: string | null; 
   onClose?: () => void;
   isReadOnly?: boolean;
   lockedBy?: string;
@@ -36,8 +36,15 @@ export default function AttributesSidebar({
   useEffect(() => {
     if (!doc || status !== "ready") return;
     const onChange = () => setTick((t) => t + 1);
-    doc.on?.("Change", onChange);
-    return () => doc.off?.("Change", onChange);
+    const dbgOnChange = () => {
+      try {
+        // eslint-disable-next-line no-console
+        console.debug("AttributesSidebar: doc Change event");
+      } catch (e) {}
+      onChange();
+    };
+    doc.on?.("Change", dbgOnChange);
+    return () => doc.off?.("Change", dbgOnChange);
   }, [doc, status]);
 
   const type = selectedComponent?.type?.value ?? null;
@@ -47,6 +54,10 @@ export default function AttributesSidebar({
 
   const setVar = useCallback((key: string, value: any) => {
     if (!selectedComponent) return;
+    try {
+      // eslint-disable-next-line no-console
+      console.debug("AttributesSidebar: setVar", key, value, selectedNodeId);
+    } catch (e) {}
     // If editing equipment media, validate against feeds relationships
     if ((key === "inputMedium" || key === "outputMedium") && (selectedComponent as any).type?.value === "equipment") {
       try {

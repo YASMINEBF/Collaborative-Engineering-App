@@ -1,7 +1,7 @@
 // src/collabs/commands/relationships.ts
 import type { CEngineeringGraph, RelId } from "../model/CEngineeringGraph";
 import type { RelationshipKind } from "../../models/relationships/enums/RelationshipTypes";
-import { PhysicalKind } from "../../models/relationships/enums/RelationshipTypes";
+import { PhysicalKind, StructuralKind } from "../../models/relationships/enums/RelationshipTypes";
 import { Medium } from "../../models/attributes/enums/Medium";
 import { ConflictKind } from "../model/enums/ConflictEnum";
 
@@ -52,7 +52,10 @@ function recordConflict(
 export function deleteRelationship(graph: CEngineeringGraph, id: RelId) {
   const rel = graph.relationships.get(id);
   if (!rel) return; // idempotent
-
+  try {
+    // eslint-disable-next-line no-console
+    console.debug("deleteRelationship: deleting", id);
+  } catch (e) {}
   // Clean feedsByPortMedium index if needed
   if (rel.kind.value === PhysicalKind.Feeds) {
     const key = makeFeedsKey(rel.sourceId.value, rel.medium.value);
@@ -61,6 +64,17 @@ export function deleteRelationship(graph: CEngineeringGraph, id: RelId) {
       graph.feedsByPortMedium.delete(key);
     }
   }
+
+  // Clean parentByChild index for hasPart if needed
+  try {
+    if (rel.kind.value === StructuralKind.HasPart) {
+      const childId = rel.targetId.value;
+      const parentId = rel.sourceId.value;
+      if (graph.parentByChild.get(childId) === parentId) {
+        graph.parentByChild.delete(childId);
+      }
+    }
+  } catch (e) {}
 
   graph.relationships.delete(id);
 }
@@ -128,6 +142,19 @@ export function createRelationship(
 
   // 2) Create it (CRDT record)
   graph.relationships.set(id, type, kind, sourceId, targetId, medium, sourceHandle, targetHandle);
+  try {
+    // eslint-disable-next-line no-console
+    console.debug("createRelationship: set", id, String(kind), sourceId, targetId, medium);
+  } catch (e) {}
+  try {
+    // Keep parentByChild index in sync for HasPart relationships.
+    if (kind === StructuralKind.HasPart) {
+      try {
+        graph.parentByChild.set(targetId, sourceId);
+      } catch (e) {}
+    }
+  } catch (e) {}
+  
 
   // If we detected a medium mismatch earlier (and recorded a conflict),
   // ensure the relationship does not keep the mismatched medium value
