@@ -2,13 +2,18 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { FaChevronLeft, FaChevronRight, FaTimes } from "react-icons/fa";
 import { useCollab } from "../../collabs/provider/CollabProvider";
 import AttributeRow from "./AttributeRow";
-import { equipmentAttributes, portAttributes, capacityUnitOptionsFor } from "./attributeSchema";
+import {
+  equipmentAttributes,
+  portAttributes,
+  capacityUnitOptionsFor,
+} from "./attributeSchema";
 import { validateAndNotifyIfBlocked } from "../../collabs/semantics/mediaChangeValidator";
 import resolveFeedMediumConflicts from "../../collabs/semantics/resolveFeedMediumConflicts";
+import resolveValueUnitConflicts from "../../collabs/semantics/resolveValueUnitConflicts";
 import "../styles/attributesSidebar.css";
 
 type Props = {
-  selectedNodeId: string | null; 
+  selectedNodeId: string | null;
   onClose?: () => void;
   isReadOnly?: boolean;
   lockedBy?: string;
@@ -33,118 +38,152 @@ export default function AttributesSidebar({
     return graph.components.get(selectedNodeId) ?? null;
   }, [status, graph, selectedNodeId]);
 
+  // Rerender on doc changes
   useEffect(() => {
     if (!doc || status !== "ready") return;
     const onChange = () => setTick((t) => t + 1);
-    const dbgOnChange = () => {
-      try {
-        // eslint-disable-next-line no-console
-        console.debug("AttributesSidebar: doc Change event");
-      } catch (e) {}
-      onChange();
-    };
-    doc.on?.("Change", dbgOnChange);
-    return () => doc.off?.("Change", dbgOnChange);
+    doc.on?.("Change", onChange);
+    return () => doc.off?.("Change", onChange);
   }, [doc, status]);
 
   const type = selectedComponent?.type?.value ?? null;
   const schema =
-    type === "equipment" ? equipmentAttributes :
-    type === "port" ? portAttributes : [];
+    type === "equipment"
+      ? equipmentAttributes
+      : type === "port"
+      ? portAttributes
+      : [];
 
-  const setVar = useCallback((key: string, value: any) => {
-    if (!selectedComponent) return;
-    try {
-      // eslint-disable-next-line no-console
-      console.debug("AttributesSidebar: setVar", key, value, selectedNodeId);
-    } catch (e) {}
-    // If editing equipment media, validate against feeds relationships
-    if ((key === "inputMedium" || key === "outputMedium") && (selectedComponent as any).type?.value === "equipment") {
-      try {
-        const newInput = key === "inputMedium" ? value : (selectedComponent as any)["inputMedium"]?.value;
-        const newOutput = key === "outputMedium" ? value : (selectedComponent as any)["outputMedium"]?.value;
-        const allowed = validateAndNotifyIfBlocked((graph as any), (selectedComponent as any).id?.value ?? (selectedComponent as any).id, newInput, newOutput);
-        if (!allowed) return;
-      } catch (e) {
-        // fall back to direct set if validation fails unexpectedly
+  /**
+   * Run changes inside a single Collabs transaction when supported.
+   * This avoids "half states" (value without unit etc.) in the CRDT history.
+   */
+  const transact = useCallback(
+    (fn: () => void) => {
+      if (doc && typeof (doc as any).transact === "function") {
+        (doc as any).transact(fn);
+      } else {
+        fn();
       }
-    }
+    },
+    [doc]
+  );
 
-    const field = (selectedComponent as any)[key];
-    if (field?.value !== undefined) {
-      // If this attribute has a companion unit CVar, update both CVar and
-      // also attempt to write a full {value, unit} pair into any MV-register
-      // present on the component so resolvers can compare pairs.
-      const companionUnit = (selectedComponent as any)[`${key}Unit`];
-      const currentUnit = companionUnit && typeof companionUnit === "object" ? companionUnit.value : undefined;
+  /**
+   * Canonical key used by the resolver for value+unit pairs.
+   * (This MUST match what your resolver scans.)
+   */
+  const valueUnitKey = useCallback((k: string) => `pair:valueUnit:${k}`, []);
 
-      field.value = value;
+  const setVar = useCallback(
+    (key: string, value: any) => {
+      if (!selectedComponent || !graph) return;
 
-      // Find an MV-like map on the component (CValueMap / CMultiValueMap)
-      try {
-        const compObj: any = selectedComponent as any;
-        for (const p of Object.keys(compObj)) {
-          try {
-            const maybeMap = compObj[p];
-            if (!maybeMap) continue;
-            if (typeof maybeMap.getConflicts === "function" && typeof maybeMap.set === "function") {
-              // Special-case width/height pair -> write to `_dims` key with both values
-              if (key === "width" || key === "height") {
-                const widthField = (selectedComponent as any)["width"];
-                const heightField = (selectedComponent as any)["height"];
-                const w = key === "width" ? value : widthField && typeof widthField === "object" ? widthField.value : undefined;
-                const h = key === "height" ? value : heightField && typeof heightField === "object" ? heightField.value : undefined;
-                const mapKey = "_dims";
-                try {
-                  maybeMap.set(mapKey, { width: w, height: h, unit: currentUnit });
-                } catch (e) {}
-                break;
-              }
+      // Validate equipment medium changes against feeds edges
+      if (
+        (key === "inputMedium" || key === "outputMedium") &&
+        (selectedComponent as any).type?.value === "equipment"
+      ) {
+        try {
+          const newInput =
+            key === "inputMedium"
+              ? value
+              : (selectedComponent as any)["inputMedium"]?.value;
+          const newOutput =
+            key === "outputMedium"
+              ? value
+              : (selectedComponent as any)["outputMedium"]?.value;
 
-              // Special-case name/description pair -> write to `_nameDesc` key
-              if (key === "uniqueName" || key === "description" || key === "name") {
-                const nameField = (selectedComponent as any)["uniqueName"] || (selectedComponent as any)["name"];
-                const descField = (selectedComponent as any)["description"];
-                const n = key === "uniqueName" || key === "name" ? value : nameField && typeof nameField === "object" ? nameField.value : undefined;
-                const d = key === "description" ? value : descField && typeof descField === "object" ? descField.value : undefined;
-                const mapKey = "_nameDesc";
-                try {
-                  maybeMap.set(mapKey, { name: n, description: d });
-                } catch (e) {}
-                break;
-              }
-
-              // Default: per-attribute value+unit key
-              const mapKey = typeof maybeMap.get === "function" ? `_valueUnit:${key}` : key;
-              try {
-                maybeMap.set(mapKey, { value, unit: currentUnit });
-              } catch (e) {}
-              break;
-            }
-          } catch (e) {}
+          const allowed = validateAndNotifyIfBlocked(
+            graph as any,
+            (selectedComponent as any).id?.value ?? (selectedComponent as any).id,
+            newInput,
+            newOutput
+          );
+          if (!allowed) return;
+        } catch {
+          // ignore; fall back to direct set
         }
-      } catch (e) {}
+      }
 
-      // After applying a medium change, run the feed-medium conflict resolver
-      // immediately so any open conflict can be marked resolved when the
-      // source/target become compatible again.
-      if ((key === "inputMedium" || key === "outputMedium") && (selectedComponent as any).type?.value === "equipment") {
+      const field = (selectedComponent as any)[key];
+      if (!field || typeof field !== "object" || !("value" in field)) return;
+
+      const attrs: any = (selectedComponent as any).attrs;
+
+      transact(() => {
+        // 1) Update the real CVar
+        field.value = value;
+
+        // 2) value+unit semantic pair -> attrs MV-register
+        // Only if there's a companion Unit CVar
+        const unitVar = (selectedComponent as any)[`${key}Unit`];
+        if (
+          attrs &&
+          typeof attrs.set === "function" &&
+          unitVar &&
+          typeof unitVar === "object" &&
+          "value" in unitVar
+        ) {
+          attrs.set(valueUnitKey(key), { value, unit: unitVar.value });
+        }
+
+        // 3) name+description semantic pair
+        if (attrs && typeof attrs.set === "function") {
+          if (key === "uniqueName" || key === "name" || key === "description") {
+            const nameVar =
+              (selectedComponent as any)["uniqueName"] ||
+              (selectedComponent as any)["name"];
+            const descVar = (selectedComponent as any)["description"];
+
+            const name =
+              key === "uniqueName" || key === "name" ? value : nameVar?.value ?? "";
+            const description =
+              key === "description" ? value : descVar?.value ?? "";
+
+            // Keep your existing key so your working resolver keeps working
+            attrs.set("pair:nameDesc", { name, description });
+          }
+        }
+
+        // 4) width+height bundled (optional but helps your width/height resolver)
+        if (attrs && typeof attrs.set === "function") {
+          if (key === "width" || key === "height") {
+            const w =
+              key === "width" ? value : (selectedComponent as any).width?.value;
+            const h =
+              key === "height" ? value : (selectedComponent as any).height?.value;
+            const unit = (selectedComponent as any).widthUnit?.value ?? "mm";
+            attrs.set("pair:dims", { width: w, height: h, unit });
+          }
+        }
+      });
+
+      // Run semantic conflict detection after the transaction
+      try {
+        resolveValueUnitConflicts(graph as any, userId ?? "system");
+      } catch {}
+
+      // Run feed-medium resolver after medium changes
+      if (
+        (key === "inputMedium" || key === "outputMedium") &&
+        (selectedComponent as any).type?.value === "equipment"
+      ) {
         try {
           resolveFeedMediumConflicts(graph as any, userId ?? "system");
-        } catch (e) {}
+        } catch {}
       }
-    }
-  }, [selectedComponent, graph, userId]);
+    },
+    [selectedComponent, graph, userId, transact, valueUnitKey]
+  );
 
   if (!selectedComponent) return null;
 
   return (
-    <div
-      className={`attr-sidebar-shell ${isCollapsed ? "collapsed" : "expanded"}`}
-    >
+    <div className={`attr-sidebar-shell ${isCollapsed ? "collapsed" : "expanded"}`}>
       <button
         className="attr-toggle"
-        onClick={() => setIsCollapsed(v => !v)}
+        onClick={() => setIsCollapsed((v) => !v)}
         title={isCollapsed ? "Open" : "Collapse"}
       >
         {isCollapsed ? <FaChevronLeft /> : <FaChevronRight />}
@@ -184,43 +223,68 @@ export default function AttributesSidebar({
             {schema.map((def) => {
               const value = (selectedComponent as any)[def.key]?.value;
 
-              // unit fields store a companion `${key}Unit` CVar (added to CEquipment/CPort)
-              const unitValue = def.kind === "unit" ? (selectedComponent as any)[`${def.key}Unit`]?.value : undefined;
+              // Unit fields store a companion `${key}Unit` CVar
+              const unitValue =
+                def.kind === "unit"
+                  ? (selectedComponent as any)[`${def.key}Unit`]?.value
+                  : undefined;
 
-              // dynamic unit options for capacity depending on medium
+              // Dynamic unit options for capacity depending on medium
               let defForRow = def as any;
               if (def.key === "capacity" && type === "port") {
                 const mediumValue = (selectedComponent as any)["medium"]?.value;
-                defForRow = { ...defForRow, unitOptions: capacityUnitOptionsFor(mediumValue) };
+                defForRow = {
+                  ...defForRow,
+                  unitOptions: capacityUnitOptionsFor(mediumValue),
+                };
               }
 
-              const onUnitChange = defForRow.kind === "unit" ? (newUnit: string) => {
-                const u = (selectedComponent as any)[`${def.key}Unit`];
-                if (u && typeof u === "object" && "value" in u) {
-                  // Update unit CVar
-                  u.value = newUnit;
+              const onUnitChange =
+                defForRow.kind === "unit"
+                  ? (newUnit: string) => {
+                      if (!graph) return;
 
-                  // Also attempt to write full pair into any MV-register on the component
-                  try {
-                    const compObj: any = selectedComponent as any;
-                    const valueField = (selectedComponent as any)[def.key];
-                    const currentValue = valueField && typeof valueField === "object" ? valueField.value : undefined;
-                    for (const p of Object.keys(compObj)) {
-                      try {
-                        const maybeMap = compObj[p];
-                        if (!maybeMap) continue;
-                        if (typeof maybeMap.getConflicts === "function" && typeof maybeMap.set === "function") {
-                          const mapKey = typeof maybeMap.get === "function" ? `_valueUnit:${def.key}` : def.key;
-                          try {
-                            maybeMap.set(mapKey, { value: currentValue, unit: newUnit });
-                          } catch (e) {}
-                          break;
+                      const unitVar = (selectedComponent as any)[`${def.key}Unit`];
+                      const attrs: any = (selectedComponent as any).attrs;
+
+                      if (
+                        !unitVar ||
+                        typeof unitVar !== "object" ||
+                        !("value" in unitVar)
+                      )
+                        return;
+
+                      transact(() => {
+                        // 1) Update the real unit CVar
+                        unitVar.value = newUnit;
+
+                        // 2) Write semantic value+unit pair into attrs MV-register
+                        const valueVar = (selectedComponent as any)[def.key];
+                        const currentValue =
+                          valueVar && typeof valueVar === "object" && "value" in valueVar
+                            ? valueVar.value
+                            : undefined;
+
+                        if (attrs && typeof attrs.set === "function") {
+                          attrs.set(valueUnitKey(def.key), {
+                            value: currentValue,
+                            unit: newUnit,
+                          });
+
+                          // If this is width/height, also update the dims bundle unit
+                          if (def.key === "width" || def.key === "height") {
+                            const w = (selectedComponent as any).width?.value;
+                            const h = (selectedComponent as any).height?.value;
+                            attrs.set("pair:dims", { width: w, height: h, unit: newUnit });
+                          }
                         }
-                      } catch (e) {}
+                      });
+
+                      try {
+                        resolveValueUnitConflicts(graph as any, userId ?? "system");
+                      } catch {}
                     }
-                  } catch (e) {}
-                }
-              } : undefined;
+                  : undefined;
 
               return (
                 <AttributeRow

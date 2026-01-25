@@ -1,16 +1,6 @@
 import type CEngineeringGraph from "../model/CEngineeringGraph";
 import { ConflictKind } from "../model/enums/ConflictEnum";
 
-/**
- * Minimal helper to apply a chosen MV-register winner for a component and
- * mark related SemanticallyRelatedAttributes conflicts resolved.
- *
- * IMPORTANT FIX:
- * - Only resolve SemanticallyRelatedAttributes conflicts that match the same
- *   semantic key we are resolving (foundKey / derived keyHint). Previously this
- *   resolved *all* semantic conflicts for the component, which could make the
- *   UI never show "open" conflicts / notifications.
- */
 export function applyMVRegisterResolution(
   graph: CEngineeringGraph,
   compId: string,
@@ -25,13 +15,11 @@ export function applyMVRegisterResolution(
     catch { return a === b; }
   };
 
-  // Only map we *know* exists on all components
   const foundMap: any = (comp as any).attrs;
   if (!foundMap || typeof foundMap.getConflicts !== "function" || typeof foundMap.set !== "function") {
     return false;
   }
 
-  // Find which key in attrs contains chosenValue among conflicts
   let foundKey: string | null = null;
   try {
     const keys: string[] = [];
@@ -40,7 +28,8 @@ export function applyMVRegisterResolution(
     } else if (typeof foundMap.keys === "function") {
       for (const k of foundMap.keys()) keys.push(String(k));
     } else {
-      keys.push("_dims", "_nameDesc", "_valueUnit");
+      // UPDATED fallback keys
+      keys.push("pair:dims", "pair:nameDesc");
     }
 
     for (const k of keys) {
@@ -57,10 +46,8 @@ export function applyMVRegisterResolution(
 
   if (!foundKey) return false;
 
-  // Apply winner to the map MV-register
   try { foundMap.set(foundKey, chosenValue); } catch {}
 
-  // Resolve only matching semantic conflicts (same comp + same key)
   const keyHint = String(foundKey);
   const semanticKeyOf = (conf: any) => {
     try { return typeof conf?.winningValue?.value?.key === "string" ? conf.winningValue.value.key : ""; }
@@ -92,8 +79,6 @@ export function applyMVRegisterResolution(
   return true;
 }
 
-
-export default function resolveMVRegisterConflicts(graph: CEngineeringGraph, currentUserId = "system") {
-  // No-op placeholder kept for compatibility.
+export default function resolveMVRegisterConflicts(_graph: CEngineeringGraph, _currentUserId = "system") {
   return;
 }

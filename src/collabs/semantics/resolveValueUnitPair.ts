@@ -1,8 +1,7 @@
 import type CEngineeringGraph from "../model/CEngineeringGraph";
 import { ConflictKind } from "../model/enums/ConflictEnum";
 
-type Pair = { value: number; unit: string };
-type PairKey = "width" | "height";
+type DimsPair = { width: number; height: number; unit: string };
 
 const semanticKeyOf = (conf: any): string => {
   try {
@@ -13,26 +12,32 @@ const semanticKeyOf = (conf: any): string => {
   }
 };
 
-export function applyValueUnitPairResolution(
+export function applyDimsPairResolution(
   graph: CEngineeringGraph,
   compId: string,
-  key: PairKey,
-  chosen: Pair,
+  chosen: DimsPair,
   currentUserId = "system"
 ) {
   const comp: any = graph.components.get(compId as any);
   if (!comp) return false;
 
-  const valueVar = key === "width" ? comp.width : comp.height;
-  const unitVar  = key === "width" ? comp.widthUnit : comp.heightUnit;
+  // 1) apply to the underlying CVars
+  try { if (comp.width) comp.width.value = chosen.width; } catch {}
+  try { if (comp.height) comp.height.value = chosen.height; } catch {}
+  try {
+    if (comp.widthUnit) comp.widthUnit.value = chosen.unit;
+    if (comp.heightUnit) comp.heightUnit.value = chosen.unit;
+  } catch {}
 
-  if (!valueVar || !unitVar) return false;
+  // 2) apply to attrs MV-register (this is what actually resolves the MV conflicts)
+  try {
+    if (comp.attrs && typeof comp.attrs.set === "function") {
+      comp.attrs.set("pair:dims", chosen);
+    }
+  } catch {}
 
-  // 1) Resolve the underlying MV-registers (REAL fix)
-  try { valueVar.value = chosen.value; } catch {}
-  try { unitVar.value = chosen.unit; } catch {}
-
-  // 2) Mark only the matching CConflict resolved (bookkeeping)
+  // 3) mark matching semantic conflict resolved (bookkeeping)
+  const keyHint = "pair:dims";
   try {
     for (const [, conf] of graph.conflicts.entries()) {
       if (conf.kind?.value !== ConflictKind.SemanticallyRelatedAttributes) continue;
@@ -40,10 +45,9 @@ export function applyValueUnitPairResolution(
       const refs = conf.entityRefs?.values ? Array.from(conf.entityRefs.values()) : [];
       if (!refs.includes(String(compId))) continue;
 
-      const confKey = semanticKeyOf(conf);
-      if (confKey !== key) continue; // IMPORTANT: only this pair
+      if (semanticKeyOf(conf) !== keyHint) continue;
 
-      conf.winningValue.value = { key, chosenValue: chosen };
+      conf.winningValue.value = { key: keyHint, chosenValue: chosen };
       conf.status.value = "resolved";
       conf.createdBy.value = currentUserId;
       conf.createdAt.value = Date.now();
