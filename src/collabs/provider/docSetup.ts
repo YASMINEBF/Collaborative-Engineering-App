@@ -18,7 +18,8 @@ export async function createLocalDoc(): Promise<{
     "ws://localhost:3001";
 
   const network = new WebSocketNetwork(url);
-  network.subscribe(doc, "engineering-graph"); // docID/room
+  // Use the same doc ID used when registering the root collab (`engineeringGraph`).
+  network.subscribe(doc, "engineeringGraph"); // docID/room
 
   network.on("Connect", () => console.log("Collabs WS connected:", url));
   network.on("Disconnect", (e) => console.log("Collabs WS disconnected:", e));
