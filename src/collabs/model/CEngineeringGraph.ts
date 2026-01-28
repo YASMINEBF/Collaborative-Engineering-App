@@ -44,6 +44,12 @@ export class CEngineeringGraph extends collabs.CObject {
   readonly feedsByPortMedium: collabs.CValueMap<string, RelId>;
   readonly parentByChild: collabs.CValueMap<ComponentId, ComponentId>;
 
+  // Deletion log (componentId -> { deletedBy, deletedAt })
+  readonly deletionLog: collabs.CValueMap<
+    ComponentId,
+    { deletedBy: string; deletedAt: number }
+  >;
+
   constructor(init: collabs.InitToken) {
     super(init);
 
@@ -57,7 +63,14 @@ export class CEngineeringGraph extends collabs.CObject {
 
             case "port":
               // Provide defaults for the extra args expected by CPort.
-              return new CPort(valueInit, id, 0, Medium.Water, uniqueName, PortType.Input);
+              return new CPort(
+                valueInit,
+                id,
+                0,
+                Medium.Water,
+                uniqueName,
+                PortType.Input
+              );
 
             default: {
               const _exhaustive: never = type;
@@ -71,7 +84,17 @@ export class CEngineeringGraph extends collabs.CObject {
     this.relationships = this.registerCollab("relationships", (i) =>
       new collabs.CMap<RelId, CRelationship, RelationshipSetArgs>(
         i,
-        (valueInit, id, type, kind, sourceId, targetId, medium, sourceHandle, targetHandle) => {
+        (
+          valueInit,
+          id,
+          type,
+          kind,
+          sourceId,
+          targetId,
+          medium,
+          sourceHandle,
+          targetHandle
+        ) => {
           // IMPORTANT: do NOT do rel.medium.value = medium here (it sends during receive/load)
           return new CRelationship(
             valueInit,
@@ -109,7 +132,17 @@ export class CEngineeringGraph extends collabs.CObject {
       "parentByChild",
       (i) => new collabs.CValueMap<ComponentId, ComponentId>(i)
     );
+
+    // ✅ NEW: Deletion log (for concurrent delete vs edit highlighting)
+    this.deletionLog = this.registerCollab(
+      "deletionLog",
+      (i) =>
+        new collabs.CValueMap<ComponentId, { deletedBy: string; deletedAt: number }>(
+          i
+        )
+    );
   }
 }
 
 export default CEngineeringGraph;
+

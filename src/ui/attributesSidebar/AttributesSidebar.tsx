@@ -107,13 +107,27 @@ export default function AttributesSidebar({
       }
 
       const field = (selectedComponent as any)[key];
-      if (!field || typeof field !== "object" || !("value" in field)) return;
+      if (!field || typeof field !== "object") return;
 
       const attrs: any = (selectedComponent as any).attrs;
 
       transact(() => {
-        // 1) Update the real CVar
-        field.value = value;
+        // 1) Update the real field (CVar or CText)
+        try {
+          if ("value" in field) {
+            field.value = value;
+          } else if (typeof (field as any).set === "function") {
+            (field as any).set(value);
+          } else if (typeof (field as any).delete === "function" && typeof (field as any).insert === "function") {
+            try {
+              const cur = typeof (field as any).toString === "function" ? String((field as any).toString()) : "";
+              (field as any).delete(0, cur.length);
+            } catch {}
+            try {
+              (field as any).insert(0, String(value ?? ""));
+            } catch {}
+          }
+        } catch {}
 
         // 2) value+unit semantic pair -> attrs MV-register
         // Only if there's a companion Unit CVar
@@ -134,12 +148,20 @@ export default function AttributesSidebar({
             const nameVar =
               (selectedComponent as any)["uniqueName"] ||
               (selectedComponent as any)["name"];
-            const descVar = (selectedComponent as any)["description"];
+            const descField = (selectedComponent as any)["description"];
 
-            const name =
-              key === "uniqueName" || key === "name" ? value : nameVar?.value ?? "";
-            const description =
-              key === "description" ? value : descVar?.value ?? "";
+            const name = key === "uniqueName" || key === "name" ? value : nameVar?.value ?? "";
+            let description = "";
+            try {
+              if (key === "description") description = String(value ?? "");
+              else if (descField) {
+                if ("value" in descField) description = String(descField.value ?? "");
+                else if (typeof descField.toString === "function") description = String(descField.toString());
+                else if (typeof descField.getText === "function") description = String(descField.getText());
+              }
+            } catch {
+              description = "";
+            }
 
             // Keep your existing key so your working resolver keeps working
             attrs.set("pair:nameDesc", { name, description });
@@ -221,7 +243,16 @@ export default function AttributesSidebar({
             <div className="attr-section-title">Attributes</div>
 
             {schema.map((def) => {
-              const value = (selectedComponent as any)[def.key]?.value;
+              // Read value from CVar or CText
+              let value: any = undefined;
+              try {
+                const f = (selectedComponent as any)[def.key];
+                if (f) {
+                  if ("value" in f) value = f.value;
+                  else if (typeof f.toString === "function") value = String(f.toString());
+                  else if (typeof f.getText === "function") value = String(f.getText());
+                }
+              } catch {}
 
               // Unit fields store a companion `${key}Unit` CVar
               const unitValue =

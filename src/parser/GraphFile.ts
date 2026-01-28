@@ -49,6 +49,39 @@ function safeObj(x: any): any {
   return x && typeof x === "object" ? x : {};
 }
 
+// Read the current description string from a component's description collab
+function readDescription(comp: any): string {
+  try {
+    const d = comp?.description;
+    if (!d) return "";
+    if (typeof d.toString === "function") return String(d.toString());
+    if (typeof d.getText === "function") return String(d.getText());
+    if (typeof d.value !== "undefined") return String(d.value ?? "");
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+// Set the description text on a component's description collab (best-effort)
+function setDescription(comp: any, txt: string) {
+  try {
+    const d = comp?.description;
+    if (!d) return;
+    if (typeof (d as any).set === "function") {
+      try { (d as any).set(txt); return; } catch {}
+    }
+    if (typeof (d as any).delete === "function" && typeof (d as any).insert === "function") {
+      try { (d as any).delete(0, 1e9); } catch {}
+      try { (d as any).insert(0, txt); } catch {}
+      return;
+    }
+    if ("value" in d) {
+      try { d.value = txt; } catch {}
+    }
+  } catch {}
+}
+
 function normalizeKind(k: any): RelationshipKind {
   // Your enums are string enums; ReactFlow uses lowercase strings like "feeds"
   const s = String(k ?? "").trim();
@@ -77,13 +110,13 @@ export function exportGraphToFile(graph: CEngineeringGraph): GraphFileV1 {
     const type = c.type.value as "equipment" | "port";
     const name = c.uniqueName.value || id;
 
-    nodes.push({
+      nodes.push({
       id,
       type,
       name,
       position: c.position?.value ? { ...c.position.value } : { x: 0, y: 0 },
       attrs: {
-        description: c.description?.value ?? "",
+        description: readDescription(c),
         ...(type === "equipment"
           ? {
               width: (c as any).width?.value ?? 0,
@@ -195,7 +228,7 @@ export function importGraphFileIntoCollabs(graph: CEngineeringGraph, file: Graph
 
       // attrs (best effort)
       const a = n.attrs ?? {};
-      if (typeof a.description === "string") c.description.value = a.description;
+      if (typeof a.description === "string") setDescription(c, a.description);
 
       if (typeof a.width === "number") c.width.value = a.width;
       if (typeof a.height === "number") c.height.value = a.height;
@@ -209,7 +242,7 @@ export function importGraphFileIntoCollabs(graph: CEngineeringGraph, file: Graph
       if (!c) continue;
 
       const a = n.attrs ?? {};
-      if (typeof a.description === "string") c.description.value = a.description;
+      if (typeof a.description === "string") setDescription(c, a.description);
 
       if (isPortType(a.portType)) c.portType.value = a.portType;
       if (typeof a.capacity === "number") c.capacity.value = a.capacity;

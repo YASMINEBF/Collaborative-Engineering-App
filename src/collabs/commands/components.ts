@@ -106,7 +106,14 @@ export function deleteComponent(graph: CEngineeringGraph, id: ComponentId, delet
 
   const doWork = () => {
     // 1) Find grandparent (parent of deleted node)
-let grandParentId: string | null = null;
+     try {
+      // graph.deletionLog was added to CEngineeringGraph in the previous step
+      graph.deletionLog.set(String(id), {
+        deletedBy: deletedBy ?? "unknown",
+        deletedAt: Date.now(),
+      });
+    } catch (e) {}
+    let grandParentId: string | null = null;
 
 // Prefer index if present
 try {
