@@ -10,7 +10,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "electron": "electron ."
+    "electron": "electron .",
+    "e2e": "VITE_E2E=1 npx playwright test",
+    "bench": "npx playwright test src/testing --workers=1"
   },
   "dependencies": {
     "@collabs/collabs": "^0.13.4",
@@ -18,6 +20,7 @@
     "@collabs/tab-sync": "^0.13.4",
     "@collabs/ws-client": "^0.13.4",
     "@collabs/ws-server": "^0.13.4",
+    "@minoru/react-dnd-treeview": "^3.5.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-icons": "^5.5.0",
@@ -26,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.58.0",
     "@types/node": "^24.10.4",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
