@@ -208,8 +208,9 @@ export function graphToReactFlowNodes(graph: CEngineeringGraphLike): Node[] {
   const nodes: Node[] = [];
   if (!graph) return nodes;
 
-  // Gather conflict entity refs for feed-medium mismatches
+  // Gather conflict entity refs for feed-medium mismatches and dangling refs
   const conflictIds = new Set<string>();
+  const danglingIds = new Set<string>();
   try {
     if (graph.conflicts) {
       for (const c of valuesOf<any>(graph.conflicts)) {
@@ -217,12 +218,17 @@ export function graphToReactFlowNodes(graph: CEngineeringGraphLike): Node[] {
           // Highlight feed-medium mismatches and cycle-detected conflicts
           if (
             c.kind?.value !== ConflictKind.FeedMediumMismatch &&
-            c.kind?.value !== ConflictKind.CycleDetected
+            c.kind?.value !== ConflictKind.CycleDetected &&
+            c.kind?.value !== ConflictKind.DanglingReference
           )
             continue;
           // Only consider open conflicts for highlighting
           if ((c.status?.value ?? "open") !== "open") continue;
-          for (const ref of c.entityRefs?.values ? c.entityRefs.values() : []) conflictIds.add(String(ref));
+          for (const ref of c.entityRefs?.values ? c.entityRefs.values() : []) {
+            const id = String(ref);
+            conflictIds.add(id);
+            if (c.kind?.value === ConflictKind.DanglingReference) danglingIds.add(id);
+          }
         } catch {}
       }
     }
@@ -233,11 +239,17 @@ export function graphToReactFlowNodes(graph: CEngineeringGraphLike): Node[] {
     if (node) nodes.push(node);
   }
 
-  // Apply conflict className to nodes whose id is referenced by a FeedMediumMismatch
+  // Apply conflict className to nodes whose id is referenced by a conflict
   return nodes.map((n) => ({
     ...n,
-    className: conflictIds.has(n.id) ? `${n.className ?? ""} node-conflict`.trim() : n.className,
-    data: { ...(n.data ?? {}), conflict: conflictIds.has(n.id) },
+    className: [
+      n.className,
+      conflictIds.has(n.id) ? "node-conflict" : null,
+      danglingIds.has(n.id) ? "node-dangling" : null,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    data: { ...(n.data ?? {}), conflict: conflictIds.has(n.id), dangling: danglingIds.has(n.id) },
   }));
 }
 
@@ -302,16 +314,22 @@ rawRels.push(`${rid} (${rk}) -> ${rs} -> ${rt}`);
   // Post-process edges to mark conflicts based on graph.conflicts
     try {
       const conflictIds = new Set<string>();
+      const danglingIds = new Set<string>();
       if (graph.conflicts) {
         for (const c of valuesOf<any>(graph.conflicts)) {
           try {
             if (
               c.kind?.value !== ConflictKind.FeedMediumMismatch &&
-              c.kind?.value !== ConflictKind.CycleDetected
+              c.kind?.value !== ConflictKind.CycleDetected &&
+              c.kind?.value !== ConflictKind.DanglingReference
             )
               continue;
             if ((c.status?.value ?? "open") !== "open") continue;
-            for (const ref of c.entityRefs?.values ? c.entityRefs.values() : []) conflictIds.add(String(ref));
+            for (const ref of c.entityRefs?.values ? c.entityRefs.values() : []) {
+              const id = String(ref);
+              conflictIds.add(id);
+              if (c.kind?.value === ConflictKind.DanglingReference) danglingIds.add(id);
+            }
           } catch {}
         }
       }
@@ -326,8 +344,14 @@ rawRels.push(`${rid} (${rk}) -> ${rs} -> ${rt}`);
 
       return edges.map((e) => ({
         ...e,
-        className: conflictIds.has(e.id) ? `${e.className ?? ""} conflict`.trim() : e.className,
-        data: { ...(e.data ?? {}), conflict: conflictIds.has(e.id) },
+        className: [
+          e.className,
+          conflictIds.has(e.id) ? "conflict" : null,
+          danglingIds.has(e.id) ? "edge-dangling" : null,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        data: { ...(e.data ?? {}), conflict: conflictIds.has(e.id), dangling: danglingIds.has(e.id) },
         labelStyle: conflictIds.has(e.id)
           ? { ...(e.labelStyle ?? {}), fill: "#a00" }
           : e.labelStyle,

@@ -44,15 +44,22 @@
 }
 
 /* Conflict highlighting for feeds medium mismatches */
-.react-flow__node.node-conflict {
-  box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.15) inset, 0 0 8px rgba(255, 0, 0, 0.08);
-}
-
 .react-flow__edge.conflict {
   color: #b71c1c !important;
 }
 .react-flow__edge.conflict .react-flow__edge-path {
   stroke-width: 4;
+}
+
+/* Dangling references styling (distinct from other conflicts) */
+.edge-dangling {
+  /* Force edge color to red regardless of edge type */
+  color: #b71c1c !important;
+}
+.edge-dangling .react-flow__edge-path {
+  stroke-width: 3.5;
+  stroke: currentColor;
+  stroke-dasharray: none;
 }
 
 /* Ensure structural hasPart edges show red conflict styling as well */

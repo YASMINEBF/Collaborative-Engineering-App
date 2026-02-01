@@ -8,11 +8,13 @@ type Notification = {
   title?: string;
   message: string;
   ts: number;
+  conflictId?: string;
+  kind?: string;
 };
 
 export function NotificationCenter() {
   const [items, setItems] = useState<Notification[]>([]);
-  const { doc, graph } = useCollab();
+  const { doc, graph, resolveConflictAction } = useCollab();
 
   // Keep a map of notification signatures -> timestamp to dedupe repeated
   // notifications originating from events or CRDT conflict scans. Entries
@@ -256,6 +258,11 @@ export function NotificationCenter() {
               const message = `Relationship(s) ${rels.join(",")} reference missing component(s) ${missingIds.join(",")} — intended deletion by ${String(intended)}`;
               const n = { id: idn, title, message, ts: Date.now() };
               setItems((s) => [n, ...s].slice(0, 6));
+              // Attach conflict metadata so UI can show actions
+              try {
+                (n as any).conflictId = confId;
+                (n as any).kind = kind;
+              } catch {}
               setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 10000);
 
               lastSeen = Math.max(lastSeen, createdAt);
@@ -282,6 +289,43 @@ export function NotificationCenter() {
     }
   }, [doc, graph]);
 
+  // Remove notifications when their corresponding conflict becomes resolved.
+  useEffect(() => {
+    if (!graph) return;
+
+    const computeOpenIdsAndFilter = () => {
+      try {
+        const openIds = new Set<string>();
+        if (typeof graph.conflicts.entries === "function") {
+          for (const [k, v] of graph.conflicts.entries()) {
+            try {
+              if ((v.status?.value ?? "open") === "open") openIds.add(String(k));
+            } catch {}
+          }
+        } else if (typeof graph.conflicts.forEach === "function") {
+          graph.conflicts.forEach((v: any, k: any) => {
+            try {
+              if ((v.status?.value ?? "open") === "open") openIds.add(String(k));
+            } catch {}
+          });
+        }
+
+        setItems((s) => s.filter((it) => !(it.conflictId && !openIds.has(it.conflictId))));
+      } catch {}
+    };
+
+    if (doc && typeof doc.on === "function") {
+      const onUpdate = () => setTimeout(computeOpenIdsAndFilter, 0);
+      doc.on("Update", onUpdate);
+      // initial run
+      computeOpenIdsAndFilter();
+      return () => doc.off?.("Update", onUpdate);
+    }
+
+    // fallback: run once
+    computeOpenIdsAndFilter();
+  }, [doc, graph]);
+
   if (items.length === 0) return null;
 
   return (
@@ -290,6 +334,31 @@ export function NotificationCenter() {
         <div key={it.id} className="ce-notification">
           <div className="ce-notification-title">{it.title}</div>
           <div className="ce-notification-message">{it.message}</div>
+          {it.conflictId && it.kind === String(ConflictKind.DanglingReference) ? (
+            <div className="ce-notification-actions">
+              <button
+                onClick={async () => {
+                  try {
+                    // keep both: just mark resolved
+                    await resolveConflictAction?.(it.conflictId as string, "keepBoth");
+                  } catch {}
+                  setItems((s) => s.filter((x) => x.id !== it.id));
+                }}
+              >
+                Keep both
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await resolveConflictAction?.(it.conflictId as string, "deleteBoth");
+                  } catch {}
+                  setItems((s) => s.filter((x) => x.id !== it.id));
+                }}
+              >
+                Delete both
+              </button>
+            </div>
+          ) : null}
         </div>
       ))}
     </div>

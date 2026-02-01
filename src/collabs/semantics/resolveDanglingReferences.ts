@@ -1,14 +1,83 @@
 import type CEngineeringGraph from "../model/CEngineeringGraph";
 import { ConflictKind } from "../model/enums/ConflictEnum";
 
-/**
- * Detect relationships whose source or target refers to a non-existent
- * component (dangling reference). Do NOT delete the relationship; instead
- * record a `DanglingReference` conflict that lists the relationship and the
- * missing component. If possible, include a best-effort `intendedDeletionBy`
- * field when another conflict or record suggests who deleted the component.
- */
+// Tune this. 3–10 seconds usually works well for “concurrent sync” windows.
+const CONCURRENCY_WINDOW_MS = 5000;
+
 export default function resolveDanglingReferences(graph: CEngineeringGraph, currentUserId = "system") {
+  // tombstone status is stored on the component itself
+  const tombstoneInfo = (id: string): { tombstoned: boolean; deletedBy?: string; deletedAt?: number } => {
+    try {
+      const c: any = graph.components.get(String(id));
+      if (!c) return { tombstoned: false };
+      const isDeleted = !!(c.isDeleted?.value ?? false);
+      if (!isDeleted) return { tombstoned: false };
+      return {
+        tombstoned: true,
+        deletedBy: c.deletedBy?.value ?? undefined,
+        deletedAt: typeof c.deletedAt?.value === "number" ? c.deletedAt.value : undefined,
+      };
+    } catch {}
+    return { tombstoned: false };
+  };
+
+  const shouldResurrect = (missingId: string, relObj: any): { ok: boolean; reason?: string } => {
+    const rec: any = (graph as any).deletionLog?.get?.(String(missingId));
+    if (!rec) return { ok: false, reason: "no deletionLog" };
+
+    const deletedAt = typeof rec.deletedAt === "number" ? rec.deletedAt : null;
+    if (!deletedAt) return { ok: false, reason: "no deletedAt" };
+
+    const age = Date.now() - deletedAt;
+    if (age > CONCURRENCY_WINDOW_MS) return { ok: false, reason: "outside concurrency window" };
+
+    // Best-effort “different user” check if relationship carries createdBy.
+    const delBy = rec.deletedBy ? String(rec.deletedBy) : null;
+    const relCreatedBy =
+      relObj?.createdBy?.value ??
+      relObj?.attrs?.get?.("createdBy") ??
+      relObj?.attrs?.createdBy ??
+      null;
+
+    if (delBy && relCreatedBy && String(relCreatedBy) === delBy) {
+      return { ok: false, reason: "same user" };
+    }
+
+    return { ok: true };
+  };
+
+  const ensureTombstoneComponent = (id: string, relObj: any) => {
+    try {
+      const rec: any = (graph as any).deletionLog?.get?.(String(id));
+      if (!rec) return;
+
+      const gate = shouldResurrect(id, relObj);
+      if (!gate.ok) return;
+
+      // If it already exists, no need to recreate (but still mark tombstone fields)
+      const exists = !!graph.components.get(String(id));
+      if (!exists) {
+        const type = (rec.type as any) ?? "equipment";
+        const uniqueName = rec.uniqueName ? String(rec.uniqueName) : `(deleted) ${id}`;
+
+        graph.components.set(String(id) as any, type, uniqueName);
+
+        try {
+          const c: any = graph.components.get(String(id));
+          if (c?.position && rec.position) c.position.value = rec.position;
+        } catch {}
+      }
+
+      // Mark as tombstone
+      try {
+        const c: any = graph.components.get(String(id));
+        if (c?.isDeleted) c.isDeleted.value = true;
+        if (c?.deletedAt) c.deletedAt.value = typeof rec.deletedAt === "number" ? rec.deletedAt : Date.now();
+        if (c?.deletedBy) c.deletedBy.value = rec.deletedBy ? String(rec.deletedBy) : "unknown";
+      } catch {}
+    } catch {}
+  };
+
   try {
     for (const rel of graph.relationships.values()) {
       try {
@@ -16,42 +85,35 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
         const srcId = rel.sourceId?.value;
         const tgtId = rel.targetId?.value;
 
-        const srcExists = typeof srcId !== "undefined" && srcId !== null && !!graph.components.get(srcId);
-        const tgtExists = typeof tgtId !== "undefined" && tgtId !== null && !!graph.components.get(tgtId);
+        const srcStr = srcId != null ? String(srcId) : null;
+        const tgtStr = tgtId != null ? String(tgtId) : null;
 
-        // If both endpoints exist, nothing to do
-        if (srcExists && tgtExists) continue;
+        // Only resurrect within concurrency window (+ different user best-effort)
+        if (srcStr && !graph.components.get(srcStr)) ensureTombstoneComponent(srcStr, rel);
+        if (tgtStr && !graph.components.get(tgtStr)) ensureTombstoneComponent(tgtStr, rel);
 
-        // For each missing endpoint, create (or ensure) a DanglingReference conflict
-        const missing: Array<{ id: string; role: "source" | "target" }> = [];
-        if (!srcExists && srcId) missing.push({ id: srcId, role: "source" });
-        if (!tgtExists && tgtId) missing.push({ id: tgtId, role: "target" });
+        const srcExists = !!(srcStr && graph.components.get(srcStr));
+        const tgtExists = !!(tgtStr && graph.components.get(tgtStr));
 
+        const srcT = srcStr ? tombstoneInfo(srcStr) : { tombstoned: false };
+        const tgtT = tgtStr ? tombstoneInfo(tgtStr) : { tombstoned: false };
+
+        const srcValid = srcExists && !srcT.tombstoned;
+        const tgtValid = tgtExists && !tgtT.tombstoned;
+
+        if (srcValid && tgtValid) continue;
+
+        const missing: Array<{ id: string; role: "source" | "target"; tombstoned: boolean; deletedBy?: string }> = [];
+        if (srcStr && !srcValid) missing.push({ id: srcStr, role: "source", tombstoned: srcT.tombstoned, deletedBy: srcT.deletedBy });
+        if (tgtStr && !tgtValid) missing.push({ id: tgtStr, role: "target", tombstoned: tgtT.tombstoned, deletedBy: tgtT.deletedBy });
         if (missing.length === 0) continue;
 
-        // Best-effort: try to find an existing conflict that indicates someone
-        // intended to delete the missing component (look for conflicts that
-        // reference the missing id and have a createdBy).
         let intendedDeletionBy: string | null = null;
-        try {
-          for (const c of graph.conflicts.values()) {
-            try {
-              const refs = c.entityRefs?.values ? Array.from(c.entityRefs.values()) : [];
-              for (const m of missing) {
-                if (refs.includes(String(m.id))) {
-                  const cb = c.createdBy?.value ?? null;
-                  if (cb) {
-                    intendedDeletionBy = String(cb);
-                    break;
-                  }
-                }
-              }
-              if (intendedDeletionBy) break;
-            } catch {}
-          }
-        } catch {}
+        for (const m of missing) {
+          if (m.deletedBy) { intendedDeletionBy = m.deletedBy; break; }
+        }
 
-        // Avoid duplicate conflicts for the same relationship + missing id
+        // Avoid duplicate conflicts for same (relId + missingId)
         for (const m of missing) {
           try {
             let already = false;
@@ -59,15 +121,12 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
               try {
                 if (existing.kind?.value !== ConflictKind.DanglingReference) continue;
                 const refs = existing.entityRefs?.values ? Array.from(existing.entityRefs.values()) : [];
-                // If this existing conflict already references our relationship
-                // and the missing component, consider it already recorded.
                 if (refs.includes(String(relId)) && refs.includes(String(m.id))) {
                   already = true;
                   break;
                 }
               } catch {}
             }
-
             if (already) continue;
 
             const id = `conf-dangling-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -77,21 +136,27 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
 
             c.entityRefs.add(String(relId));
             c.entityRefs.add(String(m.id));
-            c.winningValue.value = null;
-            c.losingValues.value = [{ missingId: m.id, role: m.role, note: "referenced component missing" }];
-            if (intendedDeletionBy) c.winningValue.value = { intendedDeletionBy };
+
+            c.winningValue.value = intendedDeletionBy ? { intendedDeletionBy } : null;
+            c.losingValues.value = [{
+              missingId: m.id,
+              role: m.role,
+              tombstoned: m.tombstoned,
+              note: m.tombstoned
+                ? "component was deleted concurrently; preserved as tombstone"
+                : "referenced component missing",
+            }];
+
             c.createdBy.value = currentUserId;
             c.createdAt.value = Date.now();
             c.status.value = "open";
-          } catch (e) {}
+          } catch {}
         }
-      } catch (e) {
-        // ignore per-relationship errors
-      }
+      } catch {}
     }
-  } catch (e) {}
+  } catch {}
 
-  // Second pass: remove dangling conflicts that are no longer valid
+  // Second pass: remove conflicts that are no longer valid
   try {
     const pairs: Array<[string, any]> = [];
     try {
@@ -100,7 +165,7 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
       } else if (typeof graph.conflicts.entries === "function") {
         for (const [k, v] of graph.conflicts.entries()) pairs.push([String(k), v]);
       }
-    } catch (e) {}
+    } catch {}
 
     for (const [confId, conf] of pairs) {
       try {
@@ -108,51 +173,21 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
         const status = conf.status?.value ?? "open";
         if (status !== "open") continue;
 
-        // Determine the component ids this conflict was created for. We record
-        // them in `losingValues` when creating the conflict (as `missingId`).
-        // Use those to decide whether the missing component still does not
-        // exist. This avoids misinterpreting a removed relationship id as a
-        // missing component.
-        let stillMissing = false;
-        try {
-          const losing = (conf.losingValues?.value as any) ?? [];
-          const missingIds: string[] = [];
-          for (const lv of losing) {
-            try {
-              if (lv && (lv.missingId || lv.id)) missingIds.push(String(lv.missingId ?? lv.id));
-            } catch {}
-          }
-
-          // If we have explicit missing ids recorded, consider the conflict
-          // resolved only when none of those ids are missing anymore.
-          if (missingIds.length > 0) {
-            for (const mid of missingIds) {
-              if (!graph.components.get(mid)) {
-                stillMissing = true;
-                break;
-              }
-            }
-          } else {
-            // Fallback: if no losingValues recorded, conservatively keep the
-            // conflict if any referenced id (that is a component) is missing.
-            for (const ref of conf.entityRefs?.values ? conf.entityRefs.values() : []) {
-              const r = String(ref);
-              if (graph.components.get(r)) {
-                if (!graph.components.get(r)) {
-                  stillMissing = true;
-                  break;
-                }
-              }
-            }
-          }
-        } catch (e) {}
-
-        if (!stillMissing) {
-          try {
-            graph.conflicts.delete(confId);
-          } catch (e) {}
+        const losing = (conf.losingValues?.value as any) ?? [];
+        const missingIds: string[] = [];
+        for (const lv of losing) {
+          if (lv && (lv.missingId || lv.id)) missingIds.push(String(lv.missingId ?? lv.id));
         }
-      } catch (e) {}
+
+        let stillInvalid = false;
+        for (const mid of missingIds) {
+          const exists = !!graph.components.get(mid);
+          const tomb = tombstoneInfo(mid).tombstoned;
+          if (!exists || tomb) { stillInvalid = true; break; }
+        }
+
+        if (!stillInvalid) graph.conflicts.delete(confId);
+      } catch {}
     }
-  } catch (e) {}
+  } catch {}
 }

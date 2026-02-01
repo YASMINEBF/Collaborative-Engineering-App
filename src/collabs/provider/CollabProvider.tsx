@@ -28,6 +28,8 @@ export type CollabContextType = {
   // MV helpers for UI: list candidates and apply resolution
   getMVRegisterCandidates?: (compId: string, key?: string) => any[];
   resolveMVRegister?: (compId: string, chosenValue: any) => boolean;
+  // Resolve conflicts by user action: e.g. 'keepBoth' or 'deleteBoth'
+  resolveConflictAction?: (conflictId: string, action: string) => Promise<boolean>;
 };
 
 const CollabContext = createContext<CollabContextType>({
@@ -154,6 +156,74 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
           }
         };
 
+        // Resolve conflict action: delete both entities or keep both and mark resolved
+        const resolveConflictAction = async (conflictId: string, action: string) => {
+          try {
+            const g = (setup as any).graph as any;
+            if (!g || !g.conflicts) return false;
+            const c = g.conflicts.get(conflictId);
+            if (!c) return false;
+
+            const refs: string[] = [];
+            try {
+              const iter = c.entityRefs?.values ? c.entityRefs.values() : [];
+              for (const v of iter) refs.push(String(v));
+            } catch {}
+
+            const { deleteRelationship } = await import("../commands/relationships");
+            const { deleteComponent } = await import("../commands/components");
+
+            const runtime: any = (g as any).runtime ?? (g as any).doc ?? null;
+
+            const doWork = () => {
+              try {
+                if (action === "deleteBoth") {
+                  for (const id of refs) {
+                    try {
+                      if (g.relationships && typeof g.relationships.get === "function" && g.relationships.get(id)) {
+                        deleteRelationship(g, id as any);
+                      }
+                    } catch {}
+                  }
+                  for (const id of refs) {
+                    try {
+                      if (g.components && typeof g.components.get === "function" && g.components.get(id)) {
+                        deleteComponent(g, id as any, localUserId ?? "user");
+                      }
+                    } catch {}
+                  }
+                }
+
+                try {
+                  c.status.value = "resolved";
+                  try { c.resolution.value = String(action); } catch {}
+                } catch {}
+
+                return true;
+              } catch (e) {
+                return false;
+              }
+            };
+
+            if (runtime && typeof runtime.transact === "function") {
+              return new Promise<boolean>((resolve) => {
+                try {
+                  runtime.transact(() => {
+                    const ok = doWork();
+                    resolve(Boolean(ok));
+                  });
+                } catch (e) {
+                  resolve(false);
+                }
+              });
+            } else {
+              return Promise.resolve(Boolean(doWork()));
+            }
+          } catch (e) {
+            return false;
+          }
+        };
+
         setState({
           status: "ready",
           doc: setup.doc,
@@ -163,6 +233,7 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
           userId: localUserId,
           getMVRegisterCandidates,
           resolveMVRegister,
+          resolveConflictAction,
         });
 
         // Temporary dev helper: expose the collab graph for console inspection

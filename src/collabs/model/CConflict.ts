@@ -9,6 +9,7 @@ export class CConflict extends collabs.CObject {
   readonly createdBy: collabs.CVar<string>;
   readonly createdAt: collabs.CVar<number>;
   readonly status: collabs.CVar<"open" | "resolved">;
+  readonly resolution: collabs.CVar<string>;
 
   constructor(init: collabs.InitToken, kind: ConflictKind) {
     super(init);
@@ -19,6 +20,7 @@ export class CConflict extends collabs.CObject {
     this.createdBy = this.registerCollab("createdBy", i => new collabs.CVar(i, ""));
     this.createdAt = this.registerCollab("createdAt", i => new collabs.CVar(i, 0));
     this.status = this.registerCollab("status", i => new collabs.CVar<"open" | "resolved">(i, "open"));
+    this.resolution = this.registerCollab("resolution", i => new collabs.CVar<string>(i, ""));
   }
 }
 export default CConflict;

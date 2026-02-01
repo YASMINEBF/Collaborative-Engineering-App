@@ -33,6 +33,15 @@ export type RelationshipSetArgs = [
 ];
 export type ConflictSetArgs = [kind: ConflictKind];
 
+// ✅ Store enough data to resurrect a tombstone component later (only on concurrency)
+export type DeletionRecord = {
+  deletedBy: string;
+  deletedAt: number;
+  type: ComponentType;
+  uniqueName: string;
+  position: { x: number; y: number } | null;
+};
+
 export class CEngineeringGraph extends collabs.CObject {
   // Root collections
   readonly components: collabs.CMap<ComponentId, AnyComponent, ComponentSetArgs>;
@@ -44,11 +53,9 @@ export class CEngineeringGraph extends collabs.CObject {
   readonly feedsByPortMedium: collabs.CValueMap<string, RelId>;
   readonly parentByChild: collabs.CValueMap<ComponentId, ComponentId>;
 
-  // Deletion log (componentId -> { deletedBy, deletedAt })
-  readonly deletionLog: collabs.CValueMap<
-    ComponentId,
-    { deletedBy: string; deletedAt: number }
-  >;
+  // ✅ Deletion log for concurrency (delete vs edge-create):
+  // if an edge arrives referencing a deleted node, we can resurrect the node as a tombstone
+  readonly deletionLog: collabs.CValueMap<ComponentId, DeletionRecord>;
 
   constructor(init: collabs.InitToken) {
     super(init);
@@ -95,7 +102,7 @@ export class CEngineeringGraph extends collabs.CObject {
           sourceHandle,
           targetHandle
         ) => {
-          // IMPORTANT: do NOT do rel.medium.value = medium here (it sends during receive/load)
+          // IMPORTANT: do NOT do rel.medium.value = medium here
           return new CRelationship(
             valueInit,
             id,
@@ -133,16 +140,12 @@ export class CEngineeringGraph extends collabs.CObject {
       (i) => new collabs.CValueMap<ComponentId, ComponentId>(i)
     );
 
-    // ✅ NEW: Deletion log (for concurrent delete vs edit highlighting)
+    // ✅ NEW: Deletion log now stores enough metadata to re-create a tombstone node for UI
     this.deletionLog = this.registerCollab(
       "deletionLog",
-      (i) =>
-        new collabs.CValueMap<ComponentId, { deletedBy: string; deletedAt: number }>(
-          i
-        )
+      (i) => new collabs.CValueMap<ComponentId, DeletionRecord>(i)
     );
   }
 }
 
 export default CEngineeringGraph;
-

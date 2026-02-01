@@ -40,6 +40,22 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+/* Conflict highlighting for feeds medium mismatches (moved from edges.css) */
+.react-flow__node.node-conflict {
+  /* Slightly smaller, more prominent red frame that matches edge color */
+  box-shadow: 0 0 3px 4px #b71c1c, 0 0 6px  !important;
+  border-radius: 8px !important;
+  outline: none !important;
+}
+
+/* Dangling references styling (distinct from other conflicts, moved from edges.css) */
+.react-flow__node.node-dangling {
+  /* Slightly smaller, more prominent red frame that matches edge color */
+  color: #b71c1c !important;
+  border-radius: 8px !important;
+  outline: none !important;
+}
+
 /* Handles */
 .node-handle {
   width: 10px;
