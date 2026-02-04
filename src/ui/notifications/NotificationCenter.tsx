@@ -10,6 +10,8 @@ type Notification = {
   ts: number;
   conflictId?: string;
   kind?: string;
+  keyHint?: string;
+  candidates?: any[];
 };
 
 export function NotificationCenter() {
@@ -189,7 +191,7 @@ export function NotificationCenter() {
               lastSeen = Math.max(lastSeen, createdAt);
               continue;
             }
-            // Semantically-related attributes (value+unit, width+height, name+description)
+            // Semantically-related attributes (value+unit, width+height, name+description, attr:*)
             if (kind === ConflictKind.SemanticallyRelatedAttributes) {
               if (status !== "open") continue;
 
@@ -209,15 +211,86 @@ export function NotificationCenter() {
               notifiedRef.current.set(confKey, now2);
 
               const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-              const title = "Semantic attribute conflict";
-              const message = `Conflicting attribute values for component(s): ${refs.join(",")} — open for manual resolution`;
-              const n = { id: idn, title, message, ts: Date.now() };
-              setItems((s) => [n, ...s].slice(0, 6));
-              setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 8000);
+              
+              // Check if this is a simple attribute conflict (attr:*) vs semantic pair (pair:*)
+              const isSimpleAttr = keyHint.startsWith("attr:");
+              const attrName = isSimpleAttr ? keyHint.slice(5) : keyHint; // Remove "attr:" prefix
+              
+              if (isSimpleAttr) {
+                // Simple attribute conflict - show values in notification with action buttons
+                const candidates = conf.losingValues?.value ?? [];
+                const title = `Concurrent edit: ${attrName}`;
+                const valueList = candidates.map((c: any) => `"${c?.value ?? c}" (${c?.editedBy ?? "?"})`).join(" vs ");
+                const message = `Component ${refs.join(", ")}: ${valueList}`;
+                const n: Notification = { 
+                  id: idn, 
+                  title, 
+                  message, 
+                  ts: Date.now(),
+                  conflictId: confId,
+                  kind: kind,
+                  keyHint: keyHint,
+                  candidates: candidates,
+                };
+                setItems((s) => [n, ...s].slice(0, 6));
+                // Don't auto-remove - user must resolve
+              } else {
+                // Semantic pair conflict - show general notification
+                const title = "Semantic attribute conflict";
+                const message = `Conflicting attribute values for component(s): ${refs.join(",")} — open for manual resolution`;
+                const n = { id: idn, title, message, ts: Date.now() };
+                setItems((s) => [n, ...s].slice(0, 6));
+                setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 8000);
+              }
 
               lastSeen = Math.max(lastSeen, createdAt);
               continue;
             }
+
+            // Concurrent attribute edit: same attribute modified by multiple users
+            if (kind === ConflictKind.ConcurrentAttributeEdit) {
+              if (status !== "open") continue;
+              if (createdAt <= lastSeen) continue;
+
+              const winning = conf.winningValue?.value ?? {};
+              const losing = conf.losingValues?.value ?? [];
+              const compName = winning.componentName ?? winning.componentId ?? "?";
+              const attrName = winning.attributeName ?? "attribute";
+              
+              // Build all candidate values for display
+              const allValues = [
+                { value: winning.value, editedBy: winning.editedBy },
+                ...losing.map((l: any) => ({ value: l.value, editedBy: l.editedBy })),
+              ];
+
+              const sig = `${kind}:${winning.componentId}:${attrName}`;
+              const now4 = Date.now();
+              if (notifiedRef.current.has(sig)) {
+                lastSeen = Math.max(lastSeen, createdAt);
+                continue;
+              }
+              notifiedRef.current.set(sig, now4);
+              notifiedRef.current.set(confKey, now4);
+
+              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+              const title = "Concurrent attribute edit";
+              const valueList = allValues.map((v: any) => `"${v.value}" (${v.editedBy})`).join(" vs ");
+              const message = `${compName}.${attrName} was edited concurrently: ${valueList}`;
+              const n: Notification = { 
+                id: idn, 
+                title, 
+                message, 
+                ts: Date.now(),
+                conflictId: confId,
+                kind: kind,
+              };
+              setItems((s) => [n, ...s].slice(0, 6));
+              // Don't auto-remove - user must resolve
+              
+              lastSeen = Math.max(lastSeen, createdAt);
+              continue;
+            }
+
             // Dangling reference: an edge points to a missing component
             if (kind === ConflictKind.DanglingReference) {
               if (status !== "open") continue;
@@ -357,6 +430,29 @@ export function NotificationCenter() {
 
   if (items.length === 0) return null;
 
+  // Helper to get conflict values for ConcurrentAttributeEdit
+  const getConflictValues = (conflictId: string): Array<{ value: any; editedBy: string }> => {
+    if (!graph) return [];
+    try {
+      const conflict = graph.conflicts.get(conflictId);
+      if (!conflict) return [];
+      const winning = conflict.winningValue?.value as any;
+      const losing = (conflict.losingValues?.value ?? []) as any[];
+      const values = [];
+      if (winning?.value !== undefined) {
+        values.push({ value: winning.value, editedBy: winning.editedBy ?? "unknown" });
+      }
+      for (const l of losing) {
+        if (l?.value !== undefined) {
+          values.push({ value: l.value, editedBy: l.editedBy ?? "unknown" });
+        }
+      }
+      return values;
+    } catch {
+      return [];
+    }
+  };
+
   return (
     <div className="ce-notification-center">
       {items.map((it) => (
@@ -396,6 +492,62 @@ export function NotificationCenter() {
               >
                 Delete both
               </button>
+            </div>
+          ) : null}
+          {it.conflictId && it.kind === String(ConflictKind.ConcurrentAttributeEdit) ? (
+            <div className="ce-notification-actions ce-attr-conflict-actions">
+              {getConflictValues(it.conflictId).map((cv, idx) => (
+                <button
+                  key={idx}
+                  className="ce-attr-choice-btn"
+                  title={`Choose "${cv.value}" (edited by ${cv.editedBy})`}
+                  onClick={async () => {
+                    try {
+                      const ok = await resolveConflictAction?.(
+                        it.conflictId as string, 
+                        `chooseValue:${JSON.stringify(cv.value)}`
+                      );
+                      if (!ok) return;
+                      setItems((s) => s.filter((x) => x.id !== it.id));
+                    } catch (e) {
+                      // eslint-disable-next-line no-console
+                      console.warn("resolveConflictAction chooseValue failed:", e);
+                    }
+                  }}
+                >
+                  Use "{String(cv.value)}"
+                  <span className="ce-attr-editor">({cv.editedBy})</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {/* Simple attribute conflicts (attr:*) from SemanticallyRelatedAttributes */}
+          {it.conflictId && it.kind === String(ConflictKind.SemanticallyRelatedAttributes) && it.keyHint?.startsWith("attr:") && it.candidates ? (
+            <div className="ce-notification-actions ce-attr-conflict-actions">
+              {it.candidates.map((cv: any, idx: number) => (
+                <button
+                  key={idx}
+                  className="ce-attr-choice-btn"
+                  title={`Choose "${cv?.value ?? cv}" (edited by ${cv?.editedBy ?? "?"})`}
+                  onClick={async () => {
+                    try {
+                      // Use resolveMVRegister to apply the chosen value
+                      const ok = await resolveConflictAction?.(
+                        it.conflictId as string, 
+                        `chooseAttrValue:${it.keyHint}:${JSON.stringify(cv)}`
+                      );
+                      if (!ok) return;
+                      setItems((s) => s.filter((x) => x.id !== it.id));
+                    } catch (e) {
+                      // eslint-disable-next-line no-console
+                      console.warn("resolveConflictAction chooseAttrValue failed:", e);
+                    }
+                  }}
+                >
+                  Use "{String(cv?.value ?? cv)}"
+                  {cv?.editedBy && <span className="ce-attr-editor">({cv.editedBy})</span>}
+                </button>
+              ))}
             </div>
           ) : null}
         </div>

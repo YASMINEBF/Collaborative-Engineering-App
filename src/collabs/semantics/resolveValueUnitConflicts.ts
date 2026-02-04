@@ -58,12 +58,19 @@ function ensureSemanticConflict(
       }
     } catch {}
   } else {
+    // Conflict already exists - only update if candidates actually changed
     const c = graph.conflicts.get(existingId as any);
     if (c) {
-      c.losingValues.value = candidates.slice();
-      c.status.value = "open";
-      c.createdBy.value = currentUserId;
-      c.createdAt.value = Date.now();
+      const existingCandidates = c.losingValues?.value ?? [];
+      const candidatesChanged = JSON.stringify(existingCandidates) !== JSON.stringify(candidates);
+      
+      if (candidatesChanged) {
+        c.losingValues.value = candidates.slice();
+        c.status.value = "open";
+        c.createdBy.value = currentUserId;
+        c.createdAt.value = Date.now();
+      }
+      // If candidates haven't changed, don't write anything to avoid re-render loop
     }
   }
 }
@@ -131,6 +138,28 @@ export default function resolveValueUnitConflicts(graph: CEngineeringGraph, curr
           const conflictNeeded = needsConflict(candidates, (a, b) => a?.value !== b?.value && a?.unit !== b?.unit);
           if (conflictNeeded) ensureSemanticConflict(graph, String(compId), String(k), candidates, currentUserId);
           else clearSemanticConflict(graph, String(compId), String(k));
+        }
+      } catch {}
+
+      // Simple conflictable attributes (color, medium, etc.) stored as attr:*
+      try {
+        const keys: string[] = [];
+        if (typeof attrs.keys === "function") {
+          for (const k of attrs.keys()) keys.push(String(k));
+        } else if (typeof attrs.entries === "function") {
+          for (const [k] of attrs.entries()) keys.push(String(k));
+        }
+
+        for (const k of keys) {
+          if (!String(k).startsWith("attr:")) continue;
+          const candidates = attrs.getConflicts(k) ?? [];
+          // Conflict if values differ (ignoring metadata like editedBy, editedAt)
+          const conflictNeeded = needsConflict(candidates, (a, b) => a?.value !== b?.value);
+          if (conflictNeeded) {
+            ensureSemanticConflict(graph, String(compId), String(k), candidates, currentUserId);
+          } else {
+            clearSemanticConflict(graph, String(compId), String(k));
+          }
         }
       } catch {}
     }

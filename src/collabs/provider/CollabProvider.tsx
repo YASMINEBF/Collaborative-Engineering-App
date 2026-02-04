@@ -369,6 +369,72 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
                     }
                   } catch {}
                 }
+                
+                // Handle chooseValue action for ConcurrentAttributeEdit conflicts
+                if (action.startsWith("chooseValue:")) {
+                  try {
+                    const chosenValueJson = action.slice("chooseValue:".length);
+                    const chosenValue = JSON.parse(chosenValueJson);
+                    
+                    // Get the component and attribute info from the conflict
+                    const winning = c.winningValue?.value as any;
+                    if (winning?.componentId && winning?.attributeName) {
+                      const comp = g.components?.get?.(winning.componentId);
+                      if (comp) {
+                        const attr = (comp as any)[winning.attributeName];
+                        if (attr && typeof attr === "object" && "value" in attr) {
+                          attr.value = chosenValue;
+                          // eslint-disable-next-line no-console
+                          console.log(`%c[resolveConflictAction] Set ${winning.componentName}.${winning.attributeName} = ${chosenValue}`, 
+                            "color: green; font-weight: bold");
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.error("[resolveConflictAction] chooseValue failed:", e);
+                  }
+                }
+
+                // Handle chooseAttrValue action for simple attribute MVReg conflicts
+                // Format: chooseAttrValue:attr:color:{"value":"Red","editedBy":"user1"}
+                if (action.startsWith("chooseAttrValue:")) {
+                  try {
+                    const rest = action.slice("chooseAttrValue:".length);
+                    const firstColonAfterKey = rest.indexOf(":", rest.indexOf(":") + 1);
+                    const keyHint = rest.slice(0, firstColonAfterKey);
+                    const chosenJson = rest.slice(firstColonAfterKey + 1);
+                    const chosen = JSON.parse(chosenJson);
+                    
+                    // Get the component from conflict entityRefs
+                    const refs = c.entityRefs?.values ? Array.from(c.entityRefs.values()) : [];
+                    const compId = refs[0];
+                    if (compId) {
+                      const comp = g.components?.get?.(compId as any);
+                      if (comp) {
+                        const attrs: any = (comp as any).attrs;
+                        if (attrs && typeof attrs.set === "function") {
+                          // Write the chosen value to the MVReg - this collapses the conflict
+                          attrs.set(keyHint, chosen);
+                          
+                          // Also update the underlying CVar if it exists
+                          const attrName = keyHint.slice(5); // Remove "attr:" prefix
+                          const cvar = (comp as any)[attrName];
+                          if (cvar && typeof cvar === "object" && "value" in cvar) {
+                            cvar.value = chosen.value;
+                          }
+                          
+                          // eslint-disable-next-line no-console
+                          console.log(`%c[resolveConflictAction] Resolved attr conflict: ${keyHint} = ${chosen.value}`, 
+                            "color: green; font-weight: bold");
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.error("[resolveConflictAction] chooseAttrValue failed:", e);
+                  }
+                }
 
                 try {
                   c.status.value = "resolved";

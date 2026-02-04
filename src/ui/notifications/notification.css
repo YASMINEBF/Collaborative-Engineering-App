@@ -27,7 +27,56 @@
   word-break: break-word;
 }
 
+.ce-notification-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ce-notification-actions button {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  background: #4a90d9;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ce-notification-actions button:hover {
+  background: #3a7bc8;
+}
+
+/* Concurrent attribute edit conflict - value choice buttons */
+.ce-attr-conflict-actions {
+  flex-direction: column;
+}
+
+.ce-attr-choice-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: #3d5a80 !important;
+}
+
+.ce-attr-choice-btn:hover {
+  background: #4a6fa5 !important;
+}
+
+.ce-attr-editor {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-left: 8px;
+}
+
 /* Light mode adjustments */
 @media (prefers-color-scheme: light) {
   .ce-notification { background: #fff; color: #222; }
+  .ce-notification-actions button { background: #1a73e8; }
+  .ce-notification-actions button:hover { background: #1557b0; }
+  .ce-attr-choice-btn { background: #2e5a88 !important; color: #fff; }
 }

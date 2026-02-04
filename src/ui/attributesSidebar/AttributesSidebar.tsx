@@ -179,6 +179,33 @@ export default function AttributesSidebar({
             attrs.set("pair:dims", { width: w, height: h, unit });
           }
         }
+
+        // 5) Simple conflictable attributes -> attrs MVReg for concurrent edit detection
+        const SIMPLE_CONFLICTABLE = [
+          "uniqueName",
+          "color",
+          "medium",
+          "inputMedium",
+          "outputMedium",
+          "state",
+          "signalType",
+          "direction",
+          "width",
+          "widthUnit",
+          "height",
+          "heightUnit",
+          "capacity",
+          "capacityUnit",
+          "flowRate",
+          "flowRateUnit",
+          "pressure",
+          "pressureUnit",
+          "temperature",
+          "temperatureUnit",
+        ];
+        if (attrs && typeof attrs.set === "function" && SIMPLE_CONFLICTABLE.includes(key)) {
+          attrs.set(`attr:${key}`, { value, editedBy: userId ?? "local", editedAt: Date.now() });
+        }
       });
 
       // Run semantic conflict detection after the transaction

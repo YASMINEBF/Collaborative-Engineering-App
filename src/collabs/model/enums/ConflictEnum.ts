@@ -5,6 +5,7 @@ export enum ConflictKind {
   CycleDetected = "cycleDetected",
   FeedMediumMismatch = "feedMediumMismatch",
   SemanticallyRelatedAttributes = "semanticallyRelatedAttributes",
+  ConcurrentAttributeEdit = "concurrentAttributeEdit",
 }
 
 export default {
