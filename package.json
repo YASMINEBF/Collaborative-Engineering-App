@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "electron": "electron .",
     "e2e": "VITE_E2E=1 npx playwright test",
-    "bench": "npx playwright test src/testing --workers=1"
+    "bench": "npx playwright test src/testing --workers=1",
+    "bench:single": "bash scripts/run-single-mismatch-bench.sh",
+    "bench:feed": "npx playwright test src/testing/feedMediumMismatch.bench.spec.ts --workers=1"
   },
   "dependencies": {
     "@collabs/collabs": "^0.13.4",

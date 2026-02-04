@@ -40,6 +40,20 @@ export type DeletionRecord = {
   type: ComponentType;
   uniqueName: string;
   position: { x: number; y: number } | null;
+  // Snapshot of incident relationships at time of deletion.
+  // Stored as JSON string because CValueMap can't serialize nested objects.
+  relationshipsJson?: string;
+  // Legacy field (kept for backwards compatibility)
+  relationships?: Array<{
+    id: string;
+    type: string;
+    kind: RelationshipKind;
+    sourceId: string;
+    targetId: string;
+    medium: Medium | null;
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+  }>;
 };
 
 export class CEngineeringGraph extends collabs.CObject {
@@ -56,6 +70,15 @@ export class CEngineeringGraph extends collabs.CObject {
   // ✅ Deletion log for concurrency (delete vs edge-create):
   // if an edge arrives referencing a deleted node, we can resurrect the node as a tombstone
   readonly deletionLog: collabs.CValueMap<ComponentId, DeletionRecord>;
+  // Snapshot log for deleted relationships so we can restore them during concurrent scenarios
+  readonly relationshipDeletionLog: collabs.CValueMap<RelId, any>;
+  
+  // ✅ NEW: Maps nodeId -> Set of relationship snapshots that were deleted when that node was deleted.
+  // This is more robust than embedding in deletionLog because:
+  // 1. It's a CValueSet, so concurrent adds don't conflict (set union semantics)
+  // 2. We can query by nodeId directly
+  // Key format: "{nodeId}::{relId}" -> relationship snapshot JSON
+  readonly deletedRelationshipsByNode: collabs.CValueMap<string, string>;
 
   constructor(init: collabs.InitToken) {
     super(init);
@@ -144,6 +167,18 @@ export class CEngineeringGraph extends collabs.CObject {
     this.deletionLog = this.registerCollab(
       "deletionLog",
       (i) => new collabs.CValueMap<ComponentId, DeletionRecord>(i)
+    );
+
+    this.relationshipDeletionLog = this.registerCollab(
+      "relationshipDeletionLog",
+      (i) => new collabs.CValueMap<RelId, any>(i)
+    );
+
+    // ✅ NEW: Track relationships deleted due to node deletion
+    // Key: "{nodeId}::{relId}", Value: JSON stringified relationship snapshot
+    this.deletedRelationshipsByNode = this.registerCollab(
+      "deletedRelationshipsByNode",
+      (i) => new collabs.CValueMap<string, string>(i)
     );
   }
 }

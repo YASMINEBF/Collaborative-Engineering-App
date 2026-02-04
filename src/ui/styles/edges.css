@@ -12,6 +12,8 @@
   stroke: currentColor;
   stroke-width: 2;
   fill: none;
+  transition: filter 150ms ease, stroke-width 150ms ease;
+  pointer-events: stroke;
 }
 
 /* =========================
@@ -75,7 +77,9 @@
    ========================= */
 
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke-width: 3.5;
+  /* Avoid changing stroke-width on hover (causes mouseenter/mouseleave twitching).
+     Use a subtle drop-shadow to indicate hover while keeping the hit area stable. */
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.12));
 }
 
 /* =========================

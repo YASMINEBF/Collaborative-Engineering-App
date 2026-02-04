@@ -1,0 +1,103 @@
+Progress: Collaborative-Engineering-App
+
+Purpose
+-------
+This document explains the architecture and runtime data flow for the Collaborative Engineering App: how the Collabs CRDT model (server-backed via WebSocket) integrates with the React UI (React Flow), how updates propagate in both directions, and important constraints and behaviors (handles, edges, registration, indices, and conflict handling).
+
+High-level components
+---------------------
+- CRuntime (from `@collabs/collabs`): the local runtime that holds collab objects and drives sync.
+- CEngineeringGraph: the single Collabs root CObject registered on the runtime. It contains collections for `components`, `relationships`, `conflicts`, and derived indices like `feedsByPortMedium`.
+- Collab types:
+  - CComponent: base component (CVar fields: id, type, uniqueName, description, position; attrs: CValueMap)
+  - CEquipment: extends CComponent with presentation fields
+  - CPort: extends CComponent, includes `capacity`, `medium`, `portType`
+  - CRelationship: stores sourceId/targetId and also `sourceHandle`/`targetHandle` to attach edges to specific handles
+  - CConflict: optional structure to capture conflicts/merge metadata
+- Provider & doc setup (`src/collabs/provider/docSetup.ts` + `CollabProvider.tsx`): constructs the `CRuntime`, registers the `CEngineeringGraph` collab, and instantiates a `WebSocketNetwork` to connect to the server. The provider exposes `{ doc, graph, createEquipment, ... }` to the React app.
+- UI adapters & hooks:
+  - `adapters/reactFlowAdapter.ts`: maps collab nodes/relationships → React Flow nodes/edges (and includes handle IDs on edges)
+  - `hooks/useGraphNodes.ts` & `hooks/useGraphEdges.ts`: subscribe to `doc` change events and recompute React Flow data
+- React Flow UI components (`GraphCanvas`, `EquipmentNode`, `PortNode`, custom nodes/handles): render nodes/edges and emit user actions (drag, connect, delete).
+- Network: `@collabs/ws-client` on the client and `@collabs/ws-server` on the server implement the Collabs WS protocol for message exchange.
+
+Core data flows (UI → Collabs → other UI replicas)
+--------------------------------------------------
+1) Create component (UI action)
+   - User drags/drops or clicks Create. React component calls a provider helper (e.g. `createEquipment(id, name)`)
+   - Implementation (demo): `createEquipment` inserts a plain object into `graph.components` (a `CValueMap`) using `.set(...)` or similar.
+   - Collabs effect: `CValueMap.set` records an operation in the local runtime and queues it to be synchronized.
+   - Local UI reaction: the provider's `doc` triggers a `Change` event; `useGraphNodes` recalculates React Flow nodes (adapting from the new map entry) and the UI renders the new node immediately (local optimistic update).
+   - Network sync: the `WebSocketNetwork` sends the operation to the server, which relays it to other replicas (or persists/forwards using the Collabs server semantics). Other replicas receive the operation and apply it into their `CRuntime`.
+   - Remote UI reaction: remote runtimes also emit `Change` events; their `useGraphNodes` hooks recompute and render the new node.
+
+2) Move node (UI drag)
+   - User drags a node in React Flow; on drag stop, UI calls a command `setComponentPosition(graph, id, position)`
+   - The command updates the component's `position` field: for CObject components this is a `CVar` (`position.value = {x,y}`); for plain-values, code replaces the stored object in `CValueMap`.
+   - This produces a local collab operation; the local UI already shows the move; runtime sends the op to server and other replicas converge.
+
+3) Create connection (UI connect)
+   - User starts a connection from a handle (either left or right) and drops onto a handle of a target node.
+   - The React Flow `onConnect` handler receives a `Connection` including: `source`, `target`, `sourceHandle`, `targetHandle` (IDs). The UI opens a ConnectionMenu prompting relationship `kind`.
+   - When confirmed, the provider calls `createRelationship(graph, relId, kind, source, target, medium, sourceHandle, targetHandle)`.
+   - The collab `relationships` CMap entry stores both node ids and handle ids. Adapter maps relationships → edges and includes `sourceHandle`/`targetHandle` on the React Flow edge so React Flow attaches to the exact handles.
+   - Network sync then sends the creation to other replicas.
+
+4) Delete node / edge
+   - Node delete: React Flow's delete handler calls `deleteComponent(graph, id)` which also triggers `deleteRelationshipsForComponent` to remove attached relationships and clean indices.
+   - Edge delete: React Flow `onEdgesDelete` calls `deleteRelationship(graph, relId)` which removes the collab relationship and cleans derived indices.
+   - All removals emit collab operations and propagate to other replicas.
+
+Edge/Handle specifics and overlap avoidance
+----------------------------------------
+- Handle-aware edges: When relationships are created we store the `sourceHandle` and `targetHandle` in the `CRelationship`. The adapter includes those in React Flow edges (edge.sourceHandle / edge.targetHandle). React Flow will then draw and anchor the edge to the correct handle element.
+- Parallel-edge handling: adapter groups edges by (source, sourceHandle, target, targetHandle). When multiple parallel edges exist between the same pair of handles we offset edge labels (and optionally can offset curves) to avoid label overlap. For robust visual separation a custom edge renderer computing different curvature for each parallel edge is recommended.
+
+Networking and synchronization model
+---------------------------------
+- Transport: `@collabs/ws-client` (client) and `@collabs/ws-server` (server) implement the Collabs WS protocol. The client subscribes to a doc/channel and pushes/receives CRDT operations.
+- Collabs guarantees: the CRDT implementations (CMap, CValueMap, CVar, CObject, etc.) provide convergent behavior — operations commute and replicas converge to a consistent state.
+- Message semantics: the websocket server understands subscribe messages, client identity, and relays operations/patches. A simple broadcast-only websocket relay is insufficient because the client expects the Collabs WS protocol.
+
+Conflict handling & registration caveat
+------------------------------------
+- Collabs types must be registered with factories (e.g., `doc.registerCollab("component", init => new CComponent(init, ...))`) before the runtime is used (before first send/receive or state load). Registering after the runtime has performed network activity produces "Already used" errors. The project uses `CValueMap` for dynamic plain-value insertion to avoid runtime registration constraints during demo flows.
+- Conflicts are handled by the underlying CRDT types; if higher-level conflict metadata is needed it can be stored in `CConflict` objects. Some collab types (CVar) use last-writer-wins semantics or other merge strategies internal to the Collabs library.
+
+Derived indices
+---------------
+- Some operations maintain indices for fast lookup (e.g., `feedsByPortMedium` mapping `portId::medium -> relId`). Commands maintain these indices when creating or deleting relationships.
+
+UI subscription model
+--------------------
+- Hooks like `useGraphNodes` and `useGraphEdges` subscribe to `doc.on('Change', ...)` (the `CRuntime` change event). On Change they recompute nodes/edges via adapter functions.
+- The adapter functions are pure projections (graph → Node[] / Edge[]) so UI stays declarative and simply re-renders based on the projection.
+
+Command pattern
+---------------
+- UI triggers a small set of commands that encapsulate collab updates: `createEquipment`, `setComponentPosition`, `createRelationship`, `deleteRelationship`, `deleteComponent`.
+- Commands ensure correctness and update derived indices atomically (inside collab operations) so the runtime sees a consistent change-set and network messages can be emitted for a single logical operation.
+
+Typical trace examples
+----------------------
+1) Two users open the app and connect to the same server channel.
+2) User A creates a pump (CValueMap.set). Runtime A emits op → server → runtime B applies op → UI B renders pump.
+3) User B connects pump to valve using the right handle as source and left handle as target. The connection includes handle ids (right-source, left-target) so the edge in both UIs attaches to the correct handles.
+4) Both users drag the valve. Each drag-stop updates `position`; runtime syncs the op; both UIs converge to the final position.
+
+Developer notes and next improvements
+-----------------------------------
+- Make components full CObjects instead of plain-values by registering factories at app start (requires registering before the runtime is used). This provides richer nested collab support and better merge semantics for attributes.
+- Implement a custom parallel-edge renderer to compute offset bezier curves (improves visual separation beyond label offsets).
+- Add network status to UI (connected / disconnected / sync-lag) and a small retry/backoff for initial connections.
+
+Files & entry points (where to look)
+-----------------------------------
+- Provider + doc setup: `src/collabs/provider/docSetup.ts`, `src/collabs/provider/CollabProvider.tsx`
+- Collabs model: `src/collabs/CEngineeringGraph.ts`, `src/collabs/CComponent.ts`, `src/collabs/CEquipment.ts`, `src/collabs/CPort.ts`, `src/collabs/CRelationship.ts`
+- Commands: `src/collabs/commands/*` (components, relationships)
+- Adapters & hooks: `src/adapters/reactFlowAdapter.ts`, `src/hooks/useGraphNodes.ts`, `src/hooks/useGraphEdges.ts`
+- UI: `src/ui/graph/GraphCanvas.tsx`, `src/ui/graph/EquipmentNode.tsx`, `src/ui/graph/PortNode.tsx`, `src/ui/sidebar/NameModal.tsx`
+- Network server: run `npx @collabs/ws-server --port 3001` (or use the `npm run collabs-ws-server` script)
+
+End of progress

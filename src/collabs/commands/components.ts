@@ -84,13 +84,22 @@ export function deleteComponent(
   id: ComponentId,
   deletedBy: string | null = null
 ) {
+  // eslint-disable-next-line no-console
+  console.log(`%c[deleteComponent] START - deleting node: ${id}`, 'color: red; font-weight: bold');
+  
   const c: any = graph.components.get(id);
-  if (!c) return;
+  if (!c) {
+    // eslint-disable-next-line no-console
+    console.log(`[deleteComponent] Component ${id} not found, aborting`);
+    return;
+  }
 
   const runtime: any = (graph as any).runtime ?? (graph as any).doc ?? null;
 
   const doWork = () => {
     const deletedAt = Date.now();
+    // eslint-disable-next-line no-console
+    console.log(`[deleteComponent] deletedAt: ${deletedAt}, deletedBy: ${deletedBy ?? "unknown"}`);
 
     // 0) record deletion attribution + snapshot for concurrency-resurrection
     try {
@@ -98,14 +107,99 @@ export function deleteComponent(
       const uniqueName = String(c.uniqueName?.value ?? id);
       const position = (c.position?.value ?? null) as { x: number; y: number } | null;
 
-      graph.deletionLog.set(String(id), {
+      // Capture a snapshot of incident relationships so we can restore them
+      // if a concurrent create references this node.
+      const relSnapshots: Array<{
+        id: string;
+        type: string;
+        kind: any;
+        sourceId: string;
+        targetId: string;
+        medium: any;
+        sourceHandle?: string | null;
+        targetHandle?: string | null;
+      }> = [];
+      
+      // eslint-disable-next-line no-console
+      console.log(`[deleteComponent] Scanning relationships for node ${id}...`);
+      
+      // Helper to extract primitive value from potential CRDT wrapper
+      const toPrimitive = (val: any): any => {
+        if (val === null || val === undefined) return null;
+        if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") return val;
+        if (typeof val === "object" && "value" in val) {
+          const inner = val.value;
+          if (inner === null || inner === undefined) return null;
+          if (typeof inner === "string" || typeof inner === "number" || typeof inner === "boolean") return inner;
+          return String(inner);
+        }
+        // If it's still an object, stringify it to avoid circular refs
+        try { return String(val); } catch { return null; }
+      };
+      
+      try {
+        for (const r of graph.relationships.values()) {
+          try {
+            const rid = String(r.id?.value ?? r.id ?? "");
+            const rs = String(r.sourceId?.value ?? r.sourceId ?? "");
+            const rt = String(r.targetId?.value ?? r.targetId ?? "");
+            if (rs === id || rt === id) {
+              // eslint-disable-next-line no-console
+              console.log(`[deleteComponent] Found incident relationship: ${rid} (${rs} -> ${rt})`);
+              const sh = toPrimitive(r.sourceHandle);
+              const th = toPrimitive(r.targetHandle);
+              const kindVal = toPrimitive(r.kind);
+              const mediumVal = toPrimitive(r.medium);
+              const typeVal = toPrimitive(r.type) ?? "relationship";
+              
+              relSnapshots.push({
+                id: rid,
+                type: String(typeVal),
+                kind: kindVal,
+                sourceId: rs,
+                targetId: rt,
+                medium: mediumVal,
+                sourceHandle: sh,
+                targetHandle: th,
+              });
+            }
+          } catch {}
+        }
+      } catch {}
+
+      // eslint-disable-next-line no-console
+      console.log(`%c[deleteComponent] Captured ${relSnapshots.length} relationship snapshots`, 'color: blue; font-weight: bold');
+      // eslint-disable-next-line no-console
+      console.log(`[deleteComponent] Relationship IDs:`, relSnapshots.map(r => r.id));
+
+      // CValueMap can't serialize nested arrays/objects directly, so we JSON-stringify the relationships
+      const deletionRecord = {
         deletedBy: deletedBy ?? "unknown",
         deletedAt,
         type,
         uniqueName,
         position,
+        // Store as JSON string since CValueMap doesn't support nested object serialization
+        relationshipsJson: JSON.stringify(relSnapshots),
+      };
+      
+      // eslint-disable-next-line no-console
+      console.log(`%c[deleteComponent] Writing to deletionLog for ${id}:`, 'color: green; font-weight: bold', deletionRecord);
+      
+      graph.deletionLog.set(String(id), deletionRecord as any);
+      
+      // Verify it was written
+      const written = graph.deletionLog.get(String(id));
+      // eslint-disable-next-line no-console
+      console.log(`%c[deleteComponent] Verified deletionLog entry:`, 'color: green', {
+        exists: !!written,
+        relationshipsJsonLength: (written as any)?.relationshipsJson?.length ?? 0
       });
-    } catch {}
+      
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error(`[deleteComponent] ERROR recording deletion log:`, e);
+    }
 
     // 1) Find grandparent (parent of deleted node) for HasPart reparenting
     let grandParentId: string | null = null;

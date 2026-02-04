@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "meta": {
+    "exportedAt": 1736700000000,
+    "name": "Test Graph"
+  },
+  "nodes": [
+    {
+      "id": "eq-1",
+      "type": "equipment",
+      "name": "Pump A",
+      "position": { "x": 150, "y": 120 },
+      "attrs": {
+        "width": 10,
+        "height": 20,
+        "color": "Red",
+        "inputMedium": "Water",
+        "outputMedium": "Water",
+        "description": "Main pump"
+      }
+    },
+    {
+      "id": "eq-2",
+      "type": "equipment",
+      "name": "Tank B",
+      "position": { "x": 420, "y": 120 },
+      "attrs": {
+        "width": 30,
+        "height": 40,
+        "color": "Blue",
+        "inputMedium": "Water",
+        "outputMedium": "Water",
+        "description": "Storage tank"
+      }
+    },
+    {
+      "id": "port-1",
+      "type": "port",
+      "name": "Outlet",
+      "position": { "x": 280, "y": 60 },
+      "attrs": {
+        "portType": "Output",
+        "capacity": 100,
+        "medium": "Water",
+        "description": "Outlet port"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "rel-1",
+      "kind": "feeds",
+      "source": "eq-1",
+      "target": "port-1",
+      "sourceHandle": "right-source",
+      "targetHandle": "left-target",
+      "medium": "Water"
+    },
+    {
+      "id": "rel-2",
+      "kind": "controls",
+      "source": "eq-1",
+      "target": "eq-2"
+    }
+  ]
+}

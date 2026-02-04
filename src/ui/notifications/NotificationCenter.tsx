@@ -236,10 +236,39 @@ export function NotificationCenter() {
               }
 
               // If no relationship remains referencing the missing component,
-              // don't notify (the edge was removed locally).
+              // try falling back to entityRefs or relationshipDeletionLog entries
+              // so previously-synced edges still surface a notification.
               if (rels.length === 0) {
-                lastSeen = Math.max(lastSeen, createdAt);
-                continue;
+                try {
+                  // collect candidate rel ids from the conflict entityRefs
+                  const candidateRels = refs.filter((r) => {
+                    try {
+                      // relationship exists now
+                      if (graph.relationships.get(String(r))) return true;
+                      // relationship snapshot exists in deletion log
+                      if (graph.relationshipDeletionLog && typeof graph.relationshipDeletionLog.get === 'function' && graph.relationshipDeletionLog.get(String(r))) return true;
+                    } catch {}
+                    return false;
+                  });
+
+                  if (candidateRels.length > 0) {
+                    // Use these for display even if not present in live relationships
+                    // eslint-disable-next-line no-console
+                    console.debug("NotificationCenter: dangling detect via fallback refs", { confId, candidateRels, refs, createdAt });
+                    // treat as rels for display
+                    for (const rr of candidateRels) rels.push(String(rr));
+                  }
+                } catch {}
+
+                if (rels.length === 0) {
+                  // Debug: log skipped dangling notification due to no remaining relationships
+                  try {
+                    // eslint-disable-next-line no-console
+                    console.debug("NotificationCenter: skipping dangling notify, no rels remain", { confId, refs, createdAt });
+                  } catch {}
+                  lastSeen = Math.max(lastSeen, createdAt);
+                  continue;
+                }
               }
 
               const intended = conf.winningValue?.value?.intendedDeletionBy ?? conf.createdBy?.value ?? "unknown";
@@ -340,9 +369,15 @@ export function NotificationCenter() {
                 onClick={async () => {
                   try {
                     // keep both: just mark resolved
-                    await resolveConflictAction?.(it.conflictId as string, "keepBoth");
-                  } catch {}
-                  setItems((s) => s.filter((x) => x.id !== it.id));
+                    const ok = await resolveConflictAction?.(it.conflictId as string, "keepBoth");
+                    if (!ok) return;
+                    // remove notif only on success
+                    setItems((s) => s.filter((x) => x.id !== it.id));
+                  } catch (e) {
+                    // keep the notification visible on failure
+                    // eslint-disable-next-line no-console
+                    console.warn("resolveConflictAction keepBoth failed:", e);
+                  }
                 }}
               >
                 Keep both
@@ -350,9 +385,13 @@ export function NotificationCenter() {
               <button
                 onClick={async () => {
                   try {
-                    await resolveConflictAction?.(it.conflictId as string, "deleteBoth");
-                  } catch {}
-                  setItems((s) => s.filter((x) => x.id !== it.id));
+                    const ok = await resolveConflictAction?.(it.conflictId as string, "deleteBoth");
+                    if (!ok) return;
+                    setItems((s) => s.filter((x) => x.id !== it.id));
+                  } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.warn("resolveConflictAction deleteBoth failed:", e);
+                  }
                 }}
               >
                 Delete both

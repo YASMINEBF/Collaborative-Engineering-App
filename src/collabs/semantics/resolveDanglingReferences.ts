@@ -5,6 +5,9 @@ import { ConflictKind } from "../model/enums/ConflictEnum";
 const CONCURRENCY_WINDOW_MS = 5000;
 
 export default function resolveDanglingReferences(graph: CEngineeringGraph, currentUserId = "system") {
+  // eslint-disable-next-line no-console
+  console.log("%c[resolveDanglingReferences] START", "color: purple; font-weight: bold; font-size: 12px");
+  
   // tombstone status is stored on the component itself
   const tombstoneInfo = (id: string): { tombstoned: boolean; deletedBy?: string; deletedAt?: number } => {
     try {
@@ -49,10 +52,29 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
   const ensureTombstoneComponent = (id: string, relObj: any) => {
     try {
       const rec: any = (graph as any).deletionLog?.get?.(String(id));
+      
+      // Parse relationshipsJson if present (new format)
+      let parsedRelationships: any[] = [];
+      if (rec?.relationshipsJson && typeof rec.relationshipsJson === "string") {
+        try { parsedRelationships = JSON.parse(rec.relationshipsJson); } catch {}
+      } else if (rec?.relationships && Array.isArray(rec.relationships)) {
+        parsedRelationships = rec.relationships;
+      }
+      
+      // eslint-disable-next-line no-console
+      console.log(`%c[ensureTombstoneComponent] id=${id}`, "color: orange; font-weight: bold", {
+        hasRec: !!rec,
+        parsedRelationshipsLength: parsedRelationships.length,
+        relationshipIds: parsedRelationships.map((r: any) => r?.id),
+      });
       if (!rec) return;
 
       const gate = shouldResurrect(id, relObj);
-      if (!gate.ok) return;
+      if (!gate.ok) {
+        // eslint-disable-next-line no-console
+        console.log(`[ensureTombstoneComponent] shouldResurrect gate failed:`, gate.reason);
+        return;
+      }
 
       // If it already exists, no need to recreate (but still mark tombstone fields)
       const exists = !!graph.components.get(String(id));
@@ -75,6 +97,37 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
         if (c?.deletedAt) c.deletedAt.value = typeof rec.deletedAt === "number" ? rec.deletedAt : Date.now();
         if (c?.deletedBy) c.deletedBy.value = rec.deletedBy ? String(rec.deletedBy) : "unknown";
       } catch {}
+      
+      // ✅ Resurrect previously-synced edges so user can see the full picture
+      // These edges were deleted when the node was deleted, but we restore them
+      // as part of the conflict so the user sees everything before deciding.
+      for (const snap of parsedRelationships) {
+        try {
+          const relId = String(snap.id);
+          // Only resurrect if the edge doesn't already exist
+          if (!graph.relationships.get(relId)) {
+            // Check that the OTHER endpoint exists (the tombstone node is `id`)
+            const otherId = snap.sourceId === id ? snap.targetId : snap.sourceId;
+            const otherExists = !!graph.components.get(String(otherId));
+            
+            if (otherExists) {
+              // eslint-disable-next-line no-console
+              console.log(`%c[ensureTombstoneComponent] Resurrecting edge ${relId}`, "color: lime; font-weight: bold");
+              
+              graph.relationships.set(
+                relId as any,
+                snap.type ?? "relationship",
+                snap.kind,
+                snap.sourceId,
+                snap.targetId,
+                snap.medium ?? null,
+                snap.sourceHandle ?? null,
+                snap.targetHandle ?? null
+              );
+            }
+          }
+        } catch {}
+      }
     } catch {}
   };
 
@@ -134,8 +187,37 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
             const c = graph.conflicts.get(id);
             if (!c) continue;
 
+            // Add the triggering relationship and the missing/tombstoned node
             c.entityRefs.add(String(relId));
             c.entityRefs.add(String(m.id));
+            
+            // ✅ Also add ALL relationships connected to this tombstone node
+            // so they get deleted if user chooses "Delete both"
+            try {
+              const rec: any = (graph as any).deletionLog?.get?.(String(m.id));
+              let parsedRels: any[] = [];
+              if (rec?.relationshipsJson && typeof rec.relationshipsJson === "string") {
+                try { parsedRels = JSON.parse(rec.relationshipsJson); } catch {}
+              } else if (rec?.relationships && Array.isArray(rec.relationships)) {
+                parsedRels = rec.relationships;
+              }
+              for (const snap of parsedRels) {
+                if (snap?.id) {
+                  c.entityRefs.add(String(snap.id));
+                }
+              }
+              // Also add any currently live relationships connected to this node
+              for (const liveRel of graph.relationships.values()) {
+                try {
+                  const liveRelId = liveRel.id?.value ?? liveRel.id;
+                  const liveSrc = liveRel.sourceId?.value;
+                  const liveTgt = liveRel.targetId?.value;
+                  if (liveSrc === m.id || liveTgt === m.id) {
+                    c.entityRefs.add(String(liveRelId));
+                  }
+                } catch {}
+              }
+            } catch {}
 
             c.winningValue.value = intendedDeletionBy ? { intendedDeletionBy } : null;
             c.losingValues.value = [{
