@@ -50,6 +50,8 @@ function recordConflict(
 type DeleteRelationshipOpts = {
   deletedBy?: string;
   recordSnapshot?: boolean; // ✅ default true
+  isCascade?: boolean; // true if deleted as side-effect of node deletion
+  cascadeFromNodeId?: string; // which node deletion caused this cascade
 };
 
 /** Delete ONE relationship safely + clean derived indices. */
@@ -62,21 +64,40 @@ export function deleteRelationship(graph: CEngineeringGraph, id: RelId, opts: De
   // ✅ Snapshot edge BEFORE deleting (so we can restore on concurrent delete-vs-create)
   if (recordSnapshot) {
     try {
-      graph.relationshipDeletionLog?.set?.(String(id), {
-        deletedAt: Date.now(),
-        deletedBy: opts.deletedBy ?? "unknown",
-        type: String(rel.type?.value ?? "relationship"),
-        kind: rel.kind?.value ?? rel.kind,
-        sourceId: String(rel.sourceId.value),
-        targetId: String(rel.targetId.value),
-        medium: rel.medium?.value ?? null,
-        sourceHandle: rel.sourceHandle?.value ?? null,
-        targetHandle: rel.targetHandle?.value ?? null,
-      });
-      try {
+      // CRITICAL: Check if there's already an EXPLICIT delete record for this edge.
+      // If so, DON'T overwrite with a cascade delete - the explicit delete takes precedence.
+      // This prevents: explicit delete → recreate → cascade delete → wrongly resurrected
+      const existingRec = graph.relationshipDeletionLog?.get?.(String(id));
+      const wasAlreadyExplicitlyDeleted = existingRec && existingRec.isCascade === false;
+      
+      // Only record if:
+      // 1. No existing record, OR
+      // 2. Existing record was cascade (okay to overwrite), OR  
+      // 3. This is also an explicit delete (okay to update timestamp)
+      const shouldRecord = !wasAlreadyExplicitlyDeleted || opts.isCascade === false;
+      
+      if (shouldRecord) {
+        graph.relationshipDeletionLog?.set?.(String(id), {
+          deletedAt: Date.now(),
+          deletedBy: opts.deletedBy ?? "unknown",
+          isCascade: opts.isCascade ?? false, // true = deleted because node was deleted; false = explicit user delete
+          cascadeFromNodeId: opts.cascadeFromNodeId ?? null, // which node deletion triggered this
+          type: String(rel.type?.value ?? "relationship"),
+          kind: rel.kind?.value ?? rel.kind,
+          sourceId: String(rel.sourceId.value),
+          targetId: String(rel.targetId.value),
+          medium: rel.medium?.value ?? null,
+          sourceHandle: rel.sourceHandle?.value ?? null,
+          targetHandle: rel.targetHandle?.value ?? null,
+        });
+        try {
+          // eslint-disable-next-line no-console
+          console.debug("deleteRelationship: recorded relationshipDeletionLog", { id, isCascade: opts.isCascade, deletedBy: opts.deletedBy ?? "unknown" });
+        } catch {}
+      } else {
         // eslint-disable-next-line no-console
-        console.debug("deleteRelationship: recorded relationshipDeletionLog", { id, deletedBy: opts.deletedBy ?? "unknown" });
-      } catch {}
+        console.debug("deleteRelationship: NOT overwriting explicit delete record", { id, existingIsCascade: existingRec?.isCascade, newIsCascade: opts.isCascade });
+      }
     } catch {}
   }
 

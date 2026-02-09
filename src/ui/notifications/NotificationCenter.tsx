@@ -111,9 +111,10 @@ export function NotificationCenter() {
             const createdAt = conf.createdAt?.value ?? 0;
             const status = conf.status?.value ?? "open";
 
-            // Dedupe by conflict id first: if we've already notified for
-            // this conflict id, skip producing another toast.
-            const confKey = `conf:${confId}`;
+            // Dedupe by conflict id + createdAt: if we've already notified for
+            // this conflict id at this createdAt time, skip producing another toast.
+            // Including createdAt allows re-opened conflicts to show notifications again.
+            const confKey = `conf:${confId}:${createdAt}`;
             if (notifiedRef.current.has(confKey)) {
               // Update lastSeen to avoid re-notifying on createdAt
               lastSeen = Math.max(lastSeen, createdAt);
@@ -346,7 +347,8 @@ export function NotificationCenter() {
 
               const intended = conf.winningValue?.value?.intendedDeletionBy ?? conf.createdBy?.value ?? "unknown";
 
-              const sig = `${kind}:${refs.map(String).sort().join(",")}:${String(intended)}:${missingIds.join(",")}`;
+              // Include createdAt in signature so re-opened conflicts show notifications again
+              const sig = `${kind}:${refs.map(String).sort().join(",")}:${String(intended)}:${missingIds.join(",")}:${createdAt}`;
               const now3 = Date.now();
               if (notifiedRef.current.has(sig)) {
                 lastSeen = Math.max(lastSeen, createdAt);

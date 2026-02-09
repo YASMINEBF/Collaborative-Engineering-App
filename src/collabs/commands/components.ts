@@ -254,7 +254,7 @@ export function deleteComponent(
 
     // 3) Reparent children (HasPart only)
     for (const { relId, childId } of outgoing) {
-      deleteRelationship(graph, relId as any);
+      deleteRelationship(graph, relId as any, { isCascade: true, cascadeFromNodeId: id });
 
       if (grandParentId) {
         if (grandParentId === childId) continue;
@@ -276,7 +276,7 @@ export function deleteComponent(
     }
 
     // 4) delete incoming parent->deleted hasPart edge(s)
-    for (const relId of incomingToDeleted) deleteRelationship(graph, relId as any);
+    for (const relId of incomingToDeleted) deleteRelationship(graph, relId as any, { isCascade: true, cascadeFromNodeId: id });
 
     // 5) IMPORTANT: delete ALL remaining incident relationships (any kind)
     // This prevents immediate resurrection in non-concurrent cases.
@@ -286,7 +286,7 @@ export function deleteComponent(
       const tgt = r.targetId.value;
       if (src === id || tgt === id) incidentRelIds.push(String(r.id.value));
     }
-    for (const rid of incidentRelIds) deleteRelationship(graph, rid as any);
+    for (const rid of incidentRelIds) deleteRelationship(graph, rid as any, { isCascade: true, cascadeFromNodeId: id });
 
     // 6) Clean name index
     try {

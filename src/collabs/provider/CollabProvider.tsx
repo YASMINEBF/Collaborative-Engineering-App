@@ -188,26 +188,93 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
 
             const doWork = () => {
               try {
+                // CRITICAL: Mark conflict as resolved FIRST, before any deletions.
+                // This prevents the resolver from re-resurrecting nodes/edges
+                // when it sees the deletion-triggered Update event.
+                try {
+                  c.status.value = "resolved";
+                  try { c.resolution.value = String(action); } catch {}
+                  try { c.resolvedBy.value = localUserId ?? "unknown"; } catch {}
+                  try { c.resolvedAt.value = Date.now(); } catch {}
+                  // eslint-disable-next-line no-console
+                  console.debug("CollabProvider.resolveConflictAction: marked resolved FIRST", { conflictId, action });
+                } catch {}
+
                 if (action === "deleteBoth") {
+                  // HARD DELETE: Remove from CRDT maps AND clean up deletion logs
+                  // so nothing can ever be resurrected again.
+                  
+                  // First, collect all node and edge IDs we're deleting
+                  const nodeIdsToHardDelete = new Set<string>();
+                  const edgeIdsToHardDelete = new Set<string>();
+                  
                   for (const id of refs) {
+                    if (g.components && typeof g.components.get === "function" && g.components.get(id)) {
+                      nodeIdsToHardDelete.add(String(id));
+                    }
+                    if (g.relationships && typeof g.relationships.get === "function" && g.relationships.get(id)) {
+                      edgeIdsToHardDelete.add(String(id));
+                    }
+                  }
+                  
+                  // Delete edges first
+                  for (const id of edgeIdsToHardDelete) {
                     try {
-                      if (g.relationships && typeof g.relationships.get === "function" && g.relationships.get(id)) {
-                        deleteRelationship(g, id as any);
-                      }
+                      deleteRelationship(g, id as any, { recordSnapshot: false }); // Don't record - we're purging
                     } catch {}
                   }
-                  for (const id of refs) {
+                  
+                  // Delete nodes (this will cascade-delete any remaining incident edges)
+                  for (const id of nodeIdsToHardDelete) {
                     try {
-                      if (g.components && typeof g.components.get === "function" && g.components.get(id)) {
-                        deleteComponent(g, id as any, localUserId ?? "user");
-                      }
+                      deleteComponent(g, id as any, localUserId ?? "user");
                     } catch {}
                   }
-                } else if (action === "keepBoth") {
-                  // Recreate missing components and relationships from deletion logs,
-                  // AND clear tombstone flags on components that were resurrected by
-                  // the resolver (they exist in the map but still have isDeleted=true).
+                  
+                  // PURGE from deletion logs - prevent any future resurrection
+                  for (const id of nodeIdsToHardDelete) {
+                    try {
+                      g.deletionLog?.delete?.(String(id));
+                      // eslint-disable-next-line no-console
+                      console.log(`%c[deleteBoth] PURGED node ${id} from deletionLog`, "color: red; font-weight: bold");
+                    } catch {}
+                  }
+                  
+                  for (const id of edgeIdsToHardDelete) {
+                    try {
+                      g.relationshipDeletionLog?.delete?.(String(id));
+                      // eslint-disable-next-line no-console
+                      console.log(`%c[deleteBoth] PURGED edge ${id} from relationshipDeletionLog`, "color: red; font-weight: bold");
+                    } catch {}
+                  }
+                  
+                  // Also purge any edges that were incident to the deleted nodes
+                  // (they may be in the log but not in refs)
                   try {
+                    if (g.relationshipDeletionLog && typeof g.relationshipDeletionLog.entries === "function") {
+                      const edgesToPurge: string[] = [];
+                      for (const [edgeId, rec] of g.relationshipDeletionLog.entries()) {
+                        const src = String(rec.sourceId ?? "");
+                        const tgt = String(rec.targetId ?? "");
+                        if (nodeIdsToHardDelete.has(src) || nodeIdsToHardDelete.has(tgt)) {
+                          edgesToPurge.push(String(edgeId));
+                        }
+                      }
+                      for (const edgeId of edgesToPurge) {
+                        try {
+                          g.relationshipDeletionLog.delete(edgeId);
+                          // eslint-disable-next-line no-console
+                          console.log(`%c[deleteBoth] PURGED incident edge ${edgeId} from relationshipDeletionLog`, "color: red");
+                        } catch {}
+                      }
+                    }
+                  } catch {}
+                  
+                } else if (action === "keepBoth") {
+                  // Restore nodes AND cascade-deleted edges (edges deleted because node was deleted)
+                  // Do NOT restore edges that were explicitly deleted by user
+                  try {
+                    // Step 1: Restore nodes
                     for (const id of refs) {
                       try {
                         const comp = g.components && typeof g.components.get === "function"
@@ -232,9 +299,7 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
                             }
                           } catch {}
                         } else {
-                          // Component exists — but it may be a tombstone left by
-                          // ensureTombstoneComponent.  Clear the flags unconditionally
-                          // so "Keep Node" actually un-deletes it.
+                          // Component exists (tombstone) — clear the flags to un-delete it
                           try { if (comp.isDeleted && comp.isDeleted.value === true) comp.isDeleted.value = false; } catch {}
                           try { if (comp.deletedAt && comp.deletedAt.value != null) comp.deletedAt.value = null; } catch {}
                           try { if (comp.deletedBy && comp.deletedBy.value != null) comp.deletedBy.value = null; } catch {}
@@ -242,11 +307,7 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
                       } catch {}
                     }
 
-                    // Restore relationships from relationshipDeletionLog if missing.
-                    // Also restore any incident edges of resurrected nodes that are
-                    // still sitting in the log but were not included in refs
-                    // (belt-and-suspenders: the resolver should have added them, but
-                    // we scan here too so resolution is self-healing).
+                    // Step 2: Find cascade-deleted edges to restore
                     const restoredNodeIds = new Set<string>();
                     for (const id of refs) {
                       try {
@@ -255,118 +316,56 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
                         }
                       } catch {}
                     }
-
-                    // Collect ALL relationship IDs we need to ensure exist:
-                    // (a) every ID already in refs, plus
-                    // (b) every ID in relationshipDeletionLog whose source or target
-                    //     is one of the restored nodes, plus
-                    // (c) every ID from deletionLog.relationshipsJson embedded snapshots
-                    const relIdsToRestore = new Set<string>(refs);
                     
-                    // eslint-disable-next-line no-console
-                    console.log("%c[keepBoth] restoredNodeIds:", "color: magenta; font-weight: bold", Array.from(restoredNodeIds));
-                    
-                    // First, gather from deletionLog.relationshipsJson (embedded snapshots stored as JSON string)
-                    // This is the primary source — deleteComponent records incident edges here
-                    const embeddedSnapshots = new Map<string, any>();
-                    try {
-                      for (const nodeId of restoredNodeIds) {
-                        try {
-                          const rec: any = g.deletionLog?.get?.(String(nodeId));
-                          // Parse the JSON string back to array
-                          let relationships: any[] = [];
-                          if (rec?.relationshipsJson && typeof rec.relationshipsJson === "string") {
-                            try {
-                              relationships = JSON.parse(rec.relationshipsJson);
-                            } catch {}
-                          } else if (rec?.relationships && Array.isArray(rec.relationships)) {
-                            // Fallback for old format
-                            relationships = rec.relationships;
-                          }
-                          
-                          if (relationships.length > 0) {
-                            // eslint-disable-next-line no-console
-                            console.log(`%c[keepBoth] deletionLog[${nodeId}].relationships:`, "color: cyan", relationships);
-                            for (const snap of relationships) {
-                              if (snap?.id) {
-                                embeddedSnapshots.set(String(snap.id), snap);
-                                relIdsToRestore.add(String(snap.id));
-                              }
-                            }
-                          }
-                        } catch {}
-                      }
-                    } catch {}
-                    
-                    // eslint-disable-next-line no-console
-                    console.log("%c[keepBoth] embeddedSnapshots from deletionLog:", "color: cyan; font-weight: bold", 
-                      Array.from(embeddedSnapshots.keys()));
-                    
-                    // Second, also check relationshipDeletionLog (written by deleteRelationship)
+                    // Only restore edges where cascadeFromNodeId matches a restored node
                     try {
                       if (g.relationshipDeletionLog) {
-                        const logEntries: Array<[string, any]> = [];
-                        try {
-                          if (typeof g.relationshipDeletionLog.entries === "function") {
-                            for (const [k, v] of g.relationshipDeletionLog.entries()) logEntries.push([String(k), v]);
-                          } else if (typeof g.relationshipDeletionLog.forEach === "function") {
-                            g.relationshipDeletionLog.forEach((v: any, k: any) => logEntries.push([String(k), v]));
-                          }
-                        } catch {}
-                        // eslint-disable-next-line no-console
-                        console.log("%c[keepBoth] relationshipDeletionLog entries:", "color: orange", logEntries);
-                        for (const [k, rec] of logEntries) {
+                        for (const [edgeId, rec] of g.relationshipDeletionLog.entries()) {
                           try {
-                            if (restoredNodeIds.has(String(rec.sourceId)) || restoredNodeIds.has(String(rec.targetId))) {
-                              relIdsToRestore.add(String(k));
-                            }
+                            // ONLY restore CASCADE deletes
+                            if (rec.isCascade !== true) continue;
+                            
+                            // KEY FIX: Only restore if THIS node's deletion caused the cascade
+                            // (not just any cascade that happens to involve this node)
+                            const cascadeFrom = rec.cascadeFromNodeId;
+                            if (!cascadeFrom || !restoredNodeIds.has(String(cascadeFrom))) continue;
+                            
+                            // Skip if edge already exists
+                            if (g.relationships.get(String(edgeId))) continue;
+                            
+                            // Check both endpoints exist
+                            const srcExists = !!g.components.get(String(rec.sourceId));
+                            const tgtExists = !!g.components.get(String(rec.targetId));
+                            if (!srcExists || !tgtExists) continue;
+                            
+                            // Restore the edge
+                            // eslint-disable-next-line no-console
+                            console.log(`%c[keepBoth] Restoring edge ${edgeId} (cascade from ${cascadeFrom})`, "color: green");
+                            g.relationships.set(
+                              String(edgeId),
+                              rec.type ?? "relationship",
+                              rec.kind,
+                              rec.sourceId,
+                              rec.targetId,
+                              rec.medium ?? null,
+                              rec.sourceHandle ?? null,
+                              rec.targetHandle ?? null
+                            );
+                            
+                            // Remove from deletion log
+                            g.relationshipDeletionLog.delete(String(edgeId));
                           } catch {}
                         }
                       }
                     } catch {}
                     
-                    // eslint-disable-next-line no-console
-                    console.log("%c[keepBoth] final relIdsToRestore:", "color: lime; font-weight: bold", Array.from(relIdsToRestore));
-
-                    for (const id of relIdsToRestore) {
+                    // Step 3: Cleanup - remove restored nodes from deletionLog
+                    for (const id of restoredNodeIds) {
                       try {
-                        if (g.relationships && typeof g.relationships.get === "function" && !g.relationships.get(id)) {
-                          // Try relationshipDeletionLog first, then fall back to embeddedSnapshots
-                          let rrec = g.relationshipDeletionLog?.get?.(String(id)) ?? null;
-                          if (!rrec && embeddedSnapshots.has(String(id))) {
-                            rrec = embeddedSnapshots.get(String(id));
-                            // eslint-disable-next-line no-console
-                            console.log(`%c[keepBoth] Using embedded snapshot for ${id}:`, "color: yellow", rrec);
-                          }
-                          
-                          if (rrec) {
-                            // eslint-disable-next-line no-console
-                            console.log(`%c[keepBoth] Restoring relationship ${id}:`, "color: green", rrec);
-                            try {
-                              g.relationships.set(
-                                String(id),
-                                rrec.type ?? "relationship",
-                                rrec.kind ?? rrec.kind,
-                                rrec.sourceId,
-                                rrec.targetId,
-                                rrec.medium ?? null,
-                                rrec.sourceHandle ?? null,
-                                rrec.targetHandle ?? null
-                              );
-                              const rel = g.relationships.get(String(id));
-                              try { if (rel?.createdAt && rel.createdAt.value === 0) rel.createdAt.value = rrec.deletedAt ?? Date.now(); } catch {}
-                              try { if (rel?.createdBy && !rel.createdBy.value) rel.createdBy.value = rrec.deletedBy ?? ""; } catch {}
-                            } catch (restoreErr) {
-                              // eslint-disable-next-line no-console
-                              console.error(`[keepBoth] Failed to restore relationship ${id}:`, restoreErr);
-                            }
-                          } else {
-                            // eslint-disable-next-line no-console
-                            console.warn(`%c[keepBoth] No snapshot found for relationship ${id}`, "color: red");
-                          }
-                        }
+                        g.deletionLog?.delete?.(String(id));
                       } catch {}
                     }
+                    
                   } catch {}
                 }
                 
@@ -436,14 +435,8 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
                   }
                 }
 
-                try {
-                  c.status.value = "resolved";
-                  try { c.resolution.value = String(action); } catch {}
-                  try {
-                    // eslint-disable-next-line no-console
-                    console.debug("CollabProvider.resolveConflictAction: marked resolved", { conflictId, action });
-                  } catch {}
-                } catch {}
+                // Note: conflict was already marked resolved at the TOP of doWork()
+                // (before any deletions) to prevent resolver race conditions
 
                 return true;
               } catch (e) {
