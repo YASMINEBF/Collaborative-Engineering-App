@@ -423,6 +423,11 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
                             cvar.value = chosen.value;
                           }
                           
+                          // Store what was chosen for other users to see
+                          try {
+                            c.winningValue.value = { key: keyHint, chosenValue: chosen, resolvedBy: localUserId };
+                          } catch {}
+                          
                           // eslint-disable-next-line no-console
                           console.log(`%c[resolveConflictAction] Resolved attr conflict: ${keyHint} = ${chosen.value}`, 
                             "color: green; font-weight: bold");
@@ -432,6 +437,157 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
                   } catch (e) {
                     // eslint-disable-next-line no-console
                     console.error("[resolveConflictAction] chooseAttrValue failed:", e);
+                  }
+                }
+
+                // Handle choosePairValue action for semantic pair conflicts (pair:dims, pair:nameDesc, pair:valueUnit)
+                // Format: choosePairValue:pair:dims:{"width":100,"height":200,"unit":"mm"}
+                if (action.startsWith("choosePairValue:")) {
+                  try {
+                    const rest = action.slice("choosePairValue:".length);
+                    // Parse: pair:dims:{json} or pair:nameDesc:{json} or pair:valueUnit:{json}
+                    const match = rest.match(/^(pair:\w+):(.+)$/);
+                    if (match) {
+                      const keyHint = match[1];
+                      const chosen = JSON.parse(match[2]);
+                      
+                      // Get the component from conflict entityRefs
+                      const refs = c.entityRefs?.values ? Array.from(c.entityRefs.values()) : [];
+                      const compId = refs[0];
+                      if (compId) {
+                        const comp = g.components?.get?.(compId as any);
+                        if (comp) {
+                          const attrs: any = (comp as any).attrs;
+                          
+                          if (keyHint === "pair:dims") {
+                            // Apply dims: width, height, unit
+                            try { if ((comp as any).width) (comp as any).width.value = chosen.width; } catch {}
+                            try { if ((comp as any).height) (comp as any).height.value = chosen.height; } catch {}
+                            try {
+                              if ((comp as any).widthUnit) (comp as any).widthUnit.value = chosen.unit;
+                              if ((comp as any).heightUnit) (comp as any).heightUnit.value = chosen.unit;
+                            } catch {}
+                            if (attrs && typeof attrs.set === "function") {
+                              attrs.set("pair:dims", chosen);
+                            }
+                            // Store what was chosen for other users to see
+                            try {
+                              c.winningValue.value = { key: keyHint, chosenValue: chosen, resolvedBy: localUserId };
+                            } catch {}
+                          } else if (keyHint === "pair:nameDesc") {
+                            // Apply name + description
+                            try { if ((comp as any).name) (comp as any).name.value = chosen.name; } catch {}
+                            try { if ((comp as any).description) (comp as any).description.value = chosen.description; } catch {}
+                            if (attrs && typeof attrs.set === "function") {
+                              attrs.set("pair:nameDesc", chosen);
+                            }
+                            // Store what was chosen for other users to see
+                            try {
+                              c.winningValue.value = { key: keyHint, chosenValue: chosen, resolvedBy: localUserId };
+                            } catch {}
+                          } else if (keyHint === "pair:valueUnit") {
+                            // Apply value + unit
+                            try { if ((comp as any).value) (comp as any).value.value = chosen.value; } catch {}
+                            try { if ((comp as any).unit) (comp as any).unit.value = chosen.unit; } catch {}
+                            if (attrs && typeof attrs.set === "function") {
+                              attrs.set("pair:valueUnit", chosen);
+                            }
+                            // Store what was chosen for other users to see
+                            try {
+                              c.winningValue.value = { key: keyHint, chosenValue: chosen, resolvedBy: localUserId };
+                            } catch {}
+                          }
+                          
+                          // eslint-disable-next-line no-console
+                          console.log(`%c[resolveConflictAction] Resolved pair conflict: ${keyHint} = ${JSON.stringify(chosen)}`, 
+                            "color: green; font-weight: bold");
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.error("[resolveConflictAction] choosePairValue failed:", e);
+                  }
+                }
+
+                // Handle FeedMediumMismatch: deleteFeeds action
+                if (action === "deleteFeeds") {
+                  try {
+                    // Find the relationship ID from entityRefs and delete it
+                    for (const ref of refs) {
+                      try {
+                        const rel = g.relationships.get(String(ref));
+                        if (rel) {
+                          // Delete the feeds relationship
+                          deleteRelationship(g, String(ref));
+                          // eslint-disable-next-line no-console
+                          console.log(`%c[resolveConflictAction] Deleted feeds relationship: ${ref}`, "color: orange; font-weight: bold");
+                        }
+                      } catch {}
+                    }
+                    // Store resolution info
+                    try {
+                      c.winningValue.value = { action: "deleteFeeds", resolvedBy: localUserId };
+                    } catch {}
+                  } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.error("[resolveConflictAction] deleteFeeds failed:", e);
+                  }
+                }
+
+                // Handle FeedMediumMismatch: revertMedium action
+                if (action.startsWith("revertMedium:")) {
+                  try {
+                    const direction = action.slice("revertMedium:".length); // "useTarget" or "useSource"
+                    const meta = c.winningValue?.value as any;
+                    const srcOut = meta?.srcOut;
+                    const tgtIn = meta?.tgtIn;
+                    
+                    // Find source and target component IDs from entityRefs
+                    let relId: string | null = null;
+                    for (const ref of refs) {
+                      if (g.relationships.get(String(ref))) {
+                        relId = String(ref);
+                        break;
+                      }
+                    }
+                    
+                    if (relId) {
+                      const rel = g.relationships.get(relId);
+                      const srcId = rel?.sourceId?.value;
+                      const tgtId = rel?.targetId?.value;
+                      
+                      if (direction === "useTarget" && srcId) {
+                        // Set source's outputMedium to target's inputMedium
+                        const src = g.components.get(srcId);
+                        if (src && (src as any).outputMedium) {
+                          (src as any).outputMedium.value = tgtIn;
+                          // eslint-disable-next-line no-console
+                          console.log(`%c[resolveConflictAction] Set source ${srcId} outputMedium = "${tgtIn}"`, "color: green; font-weight: bold");
+                        }
+                      } else if (direction === "useSource" && tgtId) {
+                        // Set target's inputMedium to source's outputMedium
+                        const tgt = g.components.get(tgtId);
+                        if (tgt && (tgt as any).inputMedium) {
+                          (tgt as any).inputMedium.value = srcOut;
+                          // eslint-disable-next-line no-console
+                          console.log(`%c[resolveConflictAction] Set target ${tgtId} inputMedium = "${srcOut}"`, "color: green; font-weight: bold");
+                        }
+                      }
+                    }
+                    
+                    // Store resolution info
+                    try {
+                      c.winningValue.value = { 
+                        action: "revertMedium", 
+                        direction, 
+                        chosenValue: direction === "useTarget" ? tgtIn : srcOut,
+                        resolvedBy: localUserId 
+                      };
+                    } catch {}
+                  } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.error("[resolveConflictAction] revertMedium failed:", e);
                   }
                 }
 

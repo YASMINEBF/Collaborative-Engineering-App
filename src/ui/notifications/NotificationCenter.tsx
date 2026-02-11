@@ -16,13 +16,17 @@ type Notification = {
 
 export function NotificationCenter() {
   const [items, setItems] = useState<Notification[]>([]);
+  const dismissedResolved = useRef<Set<string>>(new Set());
+  // Cache for resolved notifications: {conflictId: {notif, shownAt}}
+  const resolvedCache = useRef<{[conflictId: string]: {notif: Notification, shownAt: number}}>(Object.create(null));
+  const [, forceUpdate] = useState(0);
   const { doc, graph, resolveConflictAction } = useCollab();
 
-  // Keep a map of notification signatures -> timestamp to dedupe repeated
-  // notifications originating from events or CRDT conflict scans. Entries
-  // older than NOTIF_TTL_MS are considered expired and can be re-notified.
-  const NOTIF_TTL_MS = 60_000; // 60s
-  const notifiedRef = useRef<Map<string, number>>(new Map());
+  // Track when this session started - only show notifications for conflicts
+  // created AFTER this timestamp to avoid showing stale conflicts on app restart
+  // Removed unused sessionStartRef
+  // Track which resolved conflicts we've shown "resolved by" notification for
+  // removed: resolvedNotifiedRef is no longer needed
 
   // Listen for window-dispatched events (fallback / other UI code)
   useEffect(() => {
@@ -41,38 +45,13 @@ export function NotificationCenter() {
         const title = "Name conflict resolved";
         const message = `"${d.oldName}" → "${d.newName}" (id: ${d.affectedId})`;
         const n = { id, title, message, ts: Date.now() };
-        // Deduplicate by event signature
-        const sig = `event:rename:${d.affectedId}:${d.oldName}:${d.newName}`;
-        const now = Date.now();
-        // cleanup expired
-        for (const [k, t] of notifiedRef.current.entries()) if (now - t > NOTIF_TTL_MS) notifiedRef.current.delete(k);
-        if (!notifiedRef.current.has(sig)) {
-          notifiedRef.current.set(sig, now);
-          setItems((s) => [n, ...s].slice(0, 6));
-        }
-
-        // Auto-remove after 6s
-        setTimeout(() => {
-          setItems((s) => s.filter((x) => x.id !== id));
-        }, 6000);
+        setItems((s) => [n, ...s].slice(0, 6));
       } else if (d.type === "notify") {
         const id = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const title = d.title ?? "Notification";
         const message = d.message ?? "";
         const n = { id, title, message, ts: Date.now() };
-
-        // Build an event signature to dedupe similar notify events
-        const sig = `event:notify:${d.compId ?? ""}:${d.key ?? ""}:${title}:${message}`;
-        const now = Date.now();
-        for (const [k, t] of notifiedRef.current.entries()) if (now - t > NOTIF_TTL_MS) notifiedRef.current.delete(k);
-        if (!notifiedRef.current.has(sig)) {
-          notifiedRef.current.set(sig, now);
-          setItems((s) => [n, ...s].slice(0, 6));
-
-          setTimeout(() => {
-            setItems((s) => s.filter((x) => x.id !== id));
-          }, 6000);
-        }
+        setItems((s) => [n, ...s].slice(0, 6));
       }
     }
 
@@ -84,223 +63,171 @@ export function NotificationCenter() {
   useEffect(() => {
     if (!graph || !doc) return;
 
-    let lastSeen = Date.now() - 1000;
-    // Use a shared notified map (kept in ref) to avoid duplicate toasts between
-    // the event handler above and this CRDT scanning loop. Values older than
-    // NOTIF_TTL_MS are expired and can be re-notified.
-    const now = Date.now();
-    for (const [k, t] of notifiedRef.current.entries()) if (now - t > NOTIF_TTL_MS) notifiedRef.current.delete(k);
-
-    // Helper to scan existing conflicts for recent resolved duplicate-name entries
-    const scanConflicts = () => {
+    // Always project notifications from CRDT state
+    const projectNotifications = () => {
+      const entries: Array<[string, any]> = [];
       try {
-        // Iterate entries so we can dedupe by the conflict id (avoid showing
-        // the same conflict twice when it arrives via event + CRDT scan).
-        const entries: Array<[string, any]> = [];
+        if (typeof graph.conflicts.entries === "function") {
+          for (const [k, v] of graph.conflicts.entries()) entries.push([String(k), v]);
+        } else if (typeof graph.conflicts.forEach === "function") {
+          graph.conflicts.forEach((v: any, k: any) => entries.push([String(k), v]));
+        }
+      } catch (e) {}
+
+      // Only one notification per conflict, based on latest status
+      const notifMap = new Map<string, Notification>();
+      const now = Date.now();
+      for (const [confId, conf] of entries) {
+        // --- Option 1: Reset session dismissal if conflict is re-opened ---
         try {
-          if (typeof graph.conflicts.entries === "function") {
-            for (const [k, v] of graph.conflicts.entries()) entries.push([String(k), v]);
-          } else if (typeof graph.conflicts.forEach === "function") {
-            graph.conflicts.forEach((v: any, k: any) => entries.push([String(k), v]));
+          const status = conf.status?.value ?? "open";
+          if (status === "open" && dismissedResolved.current.has(confId)) {
+            dismissedResolved.current.delete(confId);
           }
-        } catch (e) {}
-
-        for (const [confId, conf] of entries) {
-          try {
-            const kind = conf.kind?.value;
-            const createdAt = conf.createdAt?.value ?? 0;
-            const status = conf.status?.value ?? "open";
-
-            // Dedupe by conflict id + createdAt: if we've already notified for
-            // this conflict id at this createdAt time, skip producing another toast.
-            // Including createdAt allows re-opened conflicts to show notifications again.
-            const confKey = `conf:${confId}:${createdAt}`;
-            if (notifiedRef.current.has(confKey)) {
-              // Update lastSeen to avoid re-notifying on createdAt
-              lastSeen = Math.max(lastSeen, createdAt);
-              continue;
+        } catch {}
+        try {
+          const kind = conf.kind?.value;
+          const createdAt = conf.createdAt?.value ?? 0;
+          const status = conf.status?.value ?? "open";
+          if (status === "resolved") {
+            const resolvedAt = conf.resolvedAt?.value ?? conf.createdAt?.value ?? 0;
+            const winningValue = conf.winningValue?.value as any;
+            const resolvedBy = winningValue?.resolvedBy ?? conf.resolvedBy?.value ?? "someone";
+            let chosenDescription = "";
+            if (winningValue?.action === "deleteFeeds") {
+              chosenDescription = "deleted feeds relationship";
+            } else if (winningValue?.action === "revertMedium") {
+              chosenDescription = `set medium to \"${winningValue.chosenValue}\"`;
+            } else if (winningValue?.key === "pair:dims" && winningValue?.chosenValue) {
+              chosenDescription = `width: ${winningValue.chosenValue.width}, height: ${winningValue.chosenValue.height}`;
+            } else if (winningValue?.key === "pair:nameDesc" && winningValue?.chosenValue) {
+              chosenDescription = `name: \"${winningValue.chosenValue.name}\", description: \"${winningValue.chosenValue.description}\"`;
+            } else if (winningValue?.key === "pair:valueUnit" && winningValue?.chosenValue) {
+              chosenDescription = `value: ${winningValue.chosenValue.value}, unit: ${winningValue.chosenValue.unit}`;
+            } else if (winningValue?.key?.startsWith("pair:valueUnit") && winningValue?.chosenValue) {
+              chosenDescription = `value: ${winningValue.chosenValue.value}, unit: ${winningValue.chosenValue.unit}`;
+            } else if (winningValue?.chosenValue !== undefined) {
+              chosenDescription = JSON.stringify(winningValue.chosenValue);
             }
-
-            // Resolved duplicate-name notifications (existing behavior)
+            const notif: Notification = {
+              id: `notif-resolved-${confId}`,
+              title: "✓ Conflict resolved",
+              message: `Resolved by ${resolvedBy}${chosenDescription ? `: ${chosenDescription}` : ""}`,
+              ts: resolvedAt,
+              conflictId: confId,
+              kind: String(kind),
+            };
+            // Store in cache if not already present
+            if (!resolvedCache.current[confId]) {
+              resolvedCache.current[confId] = { notif, shownAt: now };
+            }
+            notifMap.set(confId, notif);
+          } else if (status === "open") {
+            // Only show open notification if not resolved
             if (kind === ConflictKind.DuplicateName) {
-              if (status !== "resolved") continue;
-              if (createdAt <= lastSeen) continue;
-
               const losing = (conf.losingValues?.value as any) ?? [];
-              for (const lv of losing) {
-                const id = lv.id ?? lv["id"] ?? "?";
-                const oldName = lv.oldName ?? lv["oldName"] ?? "";
-                const newName = lv.newName ?? lv["newName"] ?? "";
-                const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-                const title = "Name conflict resolved";
-                const message = `"${oldName}" → "${newName}" (id: ${id})`;
-                const n = { id: idn, title, message, ts: Date.now() };
-                setItems((s) => [n, ...s].slice(0, 6));
-                setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 6000);
-              }
-
-              lastSeen = Math.max(lastSeen, createdAt);
-              continue;
-            }
-
-            // Feed medium mismatch: notify when open and new
-            if (kind === ConflictKind.FeedMediumMismatch) {
-              if (status !== "open") continue;
-              if (createdAt <= lastSeen) continue;
-
+              notifMap.set(confId, {
+                id: `notif-${confId}`,
+                title: "Name conflict resolved",
+                message: losing.length > 0
+                  ? `"${losing[0].oldName ?? losing[0]["oldName"] ?? ""}" → "${losing[0].newName ?? losing[0]["newName"] ?? ""}" (id: ${losing[0].id ?? losing[0]["id"] ?? "?"})`
+                  : "Duplicate name conflict",
+                ts: createdAt,
+                conflictId: confId,
+                kind: kind,
+              });
+            } else if (kind === ConflictKind.FeedMediumMismatch) {
               const meta = conf.winningValue?.value ?? {};
               const srcOut = meta.srcOut ?? null;
               const tgtIn = meta.tgtIn ?? null;
-              const createdBy = conf.createdBy?.value ?? "unknown";
-
-              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-              const title = "Feed medium conflict";
-              const message = `Feeds relationship conflict (${conf.entityRefs?.values ? Array.from(conf.entityRefs.values()).join(",") : "entities"}) — source:${String(srcOut)} target:${String(tgtIn)} (reported by ${createdBy})`;
-              const n = { id: idn, title, message, ts: Date.now() };
-              setItems((s) => [n, ...s].slice(0, 6));
-              setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 8000);
-
-              lastSeen = Math.max(lastSeen, createdAt);
-              continue;
-            }
-
-            // Cycle detected in structural (hasPart) relationships
-            if (kind === ConflictKind.CycleDetected) {
-              if (status !== "open") continue;
-              if (createdAt <= lastSeen) continue;
-
+              const refs = conf.entityRefs?.values ? Array.from(conf.entityRefs.values()) : [];
+              notifMap.set(confId, {
+                id: `notif-${confId}`,
+                title: "Feed medium conflict",
+                message: `Source outputs "${String(srcOut)}" but target expects "${String(tgtIn)}"`,
+                ts: createdAt,
+                conflictId: confId,
+                kind: kind,
+                candidates: [{ srcOut, tgtIn, refs }],
+              });
+            } else if (kind === ConflictKind.CycleDetected) {
               const createdBy = conf.createdBy?.value ?? "unknown";
               const refs = conf.entityRefs?.values ? Array.from(conf.entityRefs.values()) : [];
-
-              // Build signature to dedupe: kind + sorted refs
-              const sig = `${kind}:${refs.map(String).sort().join(",")}`;
-              const now = Date.now();
-              if (notifiedRef.current.has(sig)) {
-                lastSeen = Math.max(lastSeen, createdAt);
-                continue;
-              }
-              notifiedRef.current.set(sig, now);
-              notifiedRef.current.set(confKey, now);
-
-              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-              const title = "Cycle detected (hasPart)";
-              const message = `Cycle detected among relationships: ${refs.join(",")} (reported by ${createdBy})`;
-              const n = { id: idn, title, message, ts: Date.now() };
-              setItems((s) => [n, ...s].slice(0, 6));
-              setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 8000);
-
-              lastSeen = Math.max(lastSeen, createdAt);
-              continue;
-            }
-            // Semantically-related attributes (value+unit, width+height, name+description, attr:*)
-            if (kind === ConflictKind.SemanticallyRelatedAttributes) {
-              if (status !== "open") continue;
-
+              notifMap.set(confId, {
+                id: `notif-${confId}`,
+                title: "Cycle detected (hasPart)",
+                message: `Cycle detected among relationships: ${refs.join(",")} (reported by ${createdBy})`,
+                ts: createdAt,
+                conflictId: confId,
+                kind: kind,
+              });
+            } else if (kind === ConflictKind.SemanticallyRelatedAttributes) {
               const refs = conf.entityRefs?.values ? Array.from(conf.entityRefs.values()) : [];
-              // Build signature for dedupe: kind + sorted refs + maybe key
               let keyHint = "";
               try {
                 keyHint = conf.winningValue?.value?.key ?? conf.losingValues?.value?.[0]?.key ?? "";
               } catch (e) {}
-              const sig = `${kind}:${refs.map(String).sort().join(",")}:${String(keyHint)}`;
-              const now2 = Date.now();
-              if (notifiedRef.current.has(sig)) {
-                lastSeen = Math.max(lastSeen, createdAt);
-                continue;
-              }
-              notifiedRef.current.set(sig, now2);
-              notifiedRef.current.set(confKey, now2);
-
-              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-              
-              // Check if this is a simple attribute conflict (attr:*) vs semantic pair (pair:*)
               const isSimpleAttr = keyHint.startsWith("attr:");
-              const attrName = isSimpleAttr ? keyHint.slice(5) : keyHint; // Remove "attr:" prefix
-              
+              const attrName = isSimpleAttr ? keyHint.slice(5) : keyHint;
+              const candidates = conf.losingValues?.value ?? [];
               if (isSimpleAttr) {
-                // Simple attribute conflict - show values in notification with action buttons
-                const candidates = conf.losingValues?.value ?? [];
-                const title = `Concurrent edit: ${attrName}`;
-                const valueList = candidates.map((c: any) => `"${c?.value ?? c}" (${c?.editedBy ?? "?"})`).join(" vs ");
-                const message = `Component ${refs.join(", ")}: ${valueList}`;
-                const n: Notification = { 
-                  id: idn, 
-                  title, 
-                  message, 
-                  ts: Date.now(),
+                notifMap.set(confId, {
+                  id: `notif-${confId}`,
+                  title: `Concurrent edit: ${attrName}`,
+                  message: `Component ${refs.join(", ")}: ` + candidates.map((c: any) => `"${c?.value ?? c}" (${c?.editedBy ?? "?"})`).join(" vs "),
+                  ts: createdAt,
                   conflictId: confId,
                   kind: kind,
                   keyHint: keyHint,
                   candidates: candidates,
-                };
-                setItems((s) => [n, ...s].slice(0, 6));
-                // Don't auto-remove - user must resolve
+                });
+              } else if (keyHint.startsWith("pair:")) {
+                const pairType = keyHint.slice(5);
+                let friendlyName = pairType;
+                if (pairType === "dims") friendlyName = "Width/Height";
+                else if (pairType === "nameDesc") friendlyName = "Name/Description";
+                else if (pairType === "valueUnit") friendlyName = "Value/Unit";
+                notifMap.set(confId, {
+                  id: `notif-${confId}`,
+                  title: `Concurrent edit: ${friendlyName}`,
+                  message: `Component ${refs.join(", ")} has conflicting ${friendlyName.toLowerCase()} values`,
+                  ts: createdAt,
+                  conflictId: confId,
+                  kind: kind,
+                  keyHint: keyHint,
+                  candidates: candidates,
+                });
               } else {
-                // Semantic pair conflict - show general notification
-                const title = "Semantic attribute conflict";
-                const message = `Conflicting attribute values for component(s): ${refs.join(",")} — open for manual resolution`;
-                const n = { id: idn, title, message, ts: Date.now() };
-                setItems((s) => [n, ...s].slice(0, 6));
-                setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 8000);
+                notifMap.set(confId, {
+                  id: `notif-${confId}`,
+                  title: "Semantic attribute conflict",
+                  message: `Conflicting attribute values for component(s): ${refs.join(",")} — open for manual resolution`,
+                  ts: createdAt,
+                  conflictId: confId,
+                  kind: kind,
+                });
               }
-
-              lastSeen = Math.max(lastSeen, createdAt);
-              continue;
-            }
-
-            // Concurrent attribute edit: same attribute modified by multiple users
-            if (kind === ConflictKind.ConcurrentAttributeEdit) {
-              if (status !== "open") continue;
-              if (createdAt <= lastSeen) continue;
-
+            } else if (kind === ConflictKind.ConcurrentAttributeEdit) {
               const winning = conf.winningValue?.value ?? {};
               const losing = conf.losingValues?.value ?? [];
               const compName = winning.componentName ?? winning.componentId ?? "?";
               const attrName = winning.attributeName ?? "attribute";
-              
-              // Build all candidate values for display
               const allValues = [
                 { value: winning.value, editedBy: winning.editedBy },
                 ...losing.map((l: any) => ({ value: l.value, editedBy: l.editedBy })),
               ];
-
-              const sig = `${kind}:${winning.componentId}:${attrName}`;
-              const now4 = Date.now();
-              if (notifiedRef.current.has(sig)) {
-                lastSeen = Math.max(lastSeen, createdAt);
-                continue;
-              }
-              notifiedRef.current.set(sig, now4);
-              notifiedRef.current.set(confKey, now4);
-
-              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-              const title = "Concurrent attribute edit";
-              const valueList = allValues.map((v: any) => `"${v.value}" (${v.editedBy})`).join(" vs ");
-              const message = `${compName}.${attrName} was edited concurrently: ${valueList}`;
-              const n: Notification = { 
-                id: idn, 
-                title, 
-                message, 
-                ts: Date.now(),
+              notifMap.set(confId, {
+                id: `notif-${confId}`,
+                title: "Concurrent attribute edit",
+                message: `${compName}.${attrName} was edited concurrently: ` + allValues.map((v: any) => `"${v.value}" (${v.editedBy})`).join(" vs "),
+                ts: createdAt,
                 conflictId: confId,
                 kind: kind,
-              };
-              setItems((s) => [n, ...s].slice(0, 6));
-              // Don't auto-remove - user must resolve
-              
-              lastSeen = Math.max(lastSeen, createdAt);
-              continue;
-            }
-
-            // Dangling reference: an edge points to a missing component
-            if (kind === ConflictKind.DanglingReference) {
-              if (status !== "open") continue;
-              if (createdAt <= lastSeen) continue;
-
+                candidates: allValues,
+              });
+            } else if (kind === ConflictKind.DanglingReference) {
               const refs = conf.entityRefs?.values ? Array.from(conf.entityRefs.values()) : [];
               const rels = refs.filter((r) => !!graph.relationships.get(String(r)));
-
-              // Extract missing ids from losingValues if present
               const losing = (conf.losingValues?.value as any) ?? [];
               const missingIds: string[] = [];
               for (const lv of losing) {
@@ -308,88 +235,49 @@ export function NotificationCenter() {
                   if (lv && (lv.missingId || lv.id)) missingIds.push(String(lv.missingId ?? lv.id));
                 } catch {}
               }
-
-              // If no relationship remains referencing the missing component,
-              // try falling back to entityRefs or relationshipDeletionLog entries
-              // so previously-synced edges still surface a notification.
-              if (rels.length === 0) {
-                try {
-                  // collect candidate rel ids from the conflict entityRefs
-                  const candidateRels = refs.filter((r) => {
-                    try {
-                      // relationship exists now
-                      if (graph.relationships.get(String(r))) return true;
-                      // relationship snapshot exists in deletion log
-                      if (graph.relationshipDeletionLog && typeof graph.relationshipDeletionLog.get === 'function' && graph.relationshipDeletionLog.get(String(r))) return true;
-                    } catch {}
-                    return false;
-                  });
-
-                  if (candidateRels.length > 0) {
-                    // Use these for display even if not present in live relationships
-                    // eslint-disable-next-line no-console
-                    console.debug("NotificationCenter: dangling detect via fallback refs", { confId, candidateRels, refs, createdAt });
-                    // treat as rels for display
-                    for (const rr of candidateRels) rels.push(String(rr));
-                  }
-                } catch {}
-
-                if (rels.length === 0) {
-                  // Debug: log skipped dangling notification due to no remaining relationships
-                  try {
-                    // eslint-disable-next-line no-console
-                    console.debug("NotificationCenter: skipping dangling notify, no rels remain", { confId, refs, createdAt });
-                  } catch {}
-                  lastSeen = Math.max(lastSeen, createdAt);
-                  continue;
-                }
-              }
-
+              // Only one notification per conflictId
               const intended = conf.winningValue?.value?.intendedDeletionBy ?? conf.createdBy?.value ?? "unknown";
-
-              // Include createdAt in signature so re-opened conflicts show notifications again
-              const sig = `${kind}:${refs.map(String).sort().join(",")}:${String(intended)}:${missingIds.join(",")}:${createdAt}`;
-              const now3 = Date.now();
-              if (notifiedRef.current.has(sig)) {
-                lastSeen = Math.max(lastSeen, createdAt);
-                continue;
-              }
-              notifiedRef.current.set(sig, now3);
-              notifiedRef.current.set(confKey, now3);
-
-              const idn = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-              const title = "Dangling reference";
-              const message = `Relationship(s) ${rels.join(",")} reference missing component(s) ${missingIds.join(",")} — intended deletion by ${String(intended)}`;
-              const n = { id: idn, title, message, ts: Date.now() };
-              setItems((s) => [n, ...s].slice(0, 6));
-              // Attach conflict metadata so UI can show actions
-              try {
-                (n as any).conflictId = confId;
-                (n as any).kind = kind;
-              } catch {}
-              setTimeout(() => setItems((s) => s.filter((x) => x.id !== idn)), 10000);
-
-              lastSeen = Math.max(lastSeen, createdAt);
-              continue;
+              notifMap.set(confId, {
+                id: `notif-${confId}`,
+                title: "Dangling reference",
+                message: `Relationship(s) ${rels.join(",")} reference missing component(s) ${missingIds.join(",")} — intended deletion by ${String(intended)}`,
+                ts: createdAt,
+                conflictId: confId,
+                kind: kind,
+              });
             }
-            
-          } catch {}
-        }
-      } catch (e) {
-        // ignore scanning errors
+          }
+        } catch {}
       }
+      // Add any cached resolved notifications that should still be visible
+      for (const [confId, { notif, shownAt }] of Object.entries(resolvedCache.current)) {
+        // If not in notifMap (i.e., not in CRDT anymore), but still within 4s, show it
+        if (!notifMap.has(confId) && Date.now() - shownAt < 4000) {
+          notifMap.set(confId, notif);
+        }
+        // If expired, remove from cache
+        if (!notifMap.has(confId) && Date.now() - shownAt >= 4000) {
+          delete resolvedCache.current[confId];
+        }
+      }
+      // Filter out resolved notifications and resolved ConcurrentAttributeEdit conflicts that have been dismissed in this session
+      const filtered = Array.from(notifMap.values()).filter((notif) => {
+        // If dismissed, suppress ALL notifications for this conflictId
+        if (dismissedResolved.current.has(notif.conflictId || '')) return false;
+        return true;
+      });
+      setItems(filtered);
     };
 
-    // Attach a doc-level update listener to trigger scanning after network/docs changes
-    try {
-      const onUpdate = () => setTimeout(scanConflicts, 0);
-      doc.on?.("Update", onUpdate);
-      // initial scan
-      scanConflicts();
-      return () => doc.off?.("Update", onUpdate);
-    } catch (e) {
-      // fallback: just scan once
-      scanConflicts();
+    projectNotifications();
+
+    if (doc && typeof doc.on === "function") {
+      const onUpdate = () => {
+        projectNotifications();
+        forceUpdate((n) => n + 1);
+      };
+      doc.on("Update", onUpdate);
+      return () => doc.off("Update", onUpdate);
     }
   }, [doc, graph]);
 
@@ -398,24 +286,8 @@ export function NotificationCenter() {
     if (!graph) return;
 
     const computeOpenIdsAndFilter = () => {
-      try {
-        const openIds = new Set<string>();
-        if (typeof graph.conflicts.entries === "function") {
-          for (const [k, v] of graph.conflicts.entries()) {
-            try {
-              if ((v.status?.value ?? "open") === "open") openIds.add(String(k));
-            } catch {}
-          }
-        } else if (typeof graph.conflicts.forEach === "function") {
-          graph.conflicts.forEach((v: any, k: any) => {
-            try {
-              if ((v.status?.value ?? "open") === "open") openIds.add(String(k));
-            } catch {}
-          });
-        }
-
-        setItems((s) => s.filter((it) => !(it.conflictId && !openIds.has(it.conflictId))));
-      } catch {}
+      // No longer filtering resolved conflicts - they stay in items and render differently
+      // This function is kept for potential future filtering needs
     };
 
     if (doc && typeof doc.on === "function") {
@@ -431,6 +303,53 @@ export function NotificationCenter() {
   }, [doc, graph]);
 
   if (items.length === 0) return null;
+
+  // Helper to check if a conflict is resolved and get resolution info
+  const getConflictResolution = (conflictId: string): { resolved: boolean; resolvedBy: string; chosenValue: any; keyHint: string } | null => {
+    if (!graph) return null;
+    try {
+      const conflict = graph.conflicts.get(conflictId);
+      if (!conflict) return null;
+      const status = conflict.status?.value;
+      if (status !== "resolved") return null;
+      
+      const winningValue = conflict.winningValue?.value as any;
+      const resolvedBy = winningValue?.resolvedBy ?? conflict.resolvedBy?.value ?? "someone";
+      const chosenValue = winningValue?.chosenValue ?? winningValue;
+      const keyHint = winningValue?.key ?? "";
+      
+      return { resolved: true, resolvedBy, chosenValue, keyHint };
+    } catch {
+      return null;
+    }
+  };
+
+  // Helper to format chosen value for display
+  const formatChosenValue = (chosenValue: any, keyHint: string): string => {
+    if (!chosenValue) return "";
+    try {
+      if (keyHint === "pair:dims") {
+        return `width: ${chosenValue.width}, height: ${chosenValue.height}`;
+      } else if (keyHint === "pair:nameDesc") {
+        return `name: "${chosenValue.name}", description: "${chosenValue.description}"`;
+      } else if (keyHint === "pair:valueUnit") {
+        return `value: ${chosenValue.value}, unit: ${chosenValue.unit}`;
+      } else if (keyHint.startsWith("pair:valueUnit")) {
+        return `value: ${chosenValue.value}, unit: ${chosenValue.unit}`;
+      } else if (chosenValue.action === "deleteFeeds") {
+        return "deleted feeds relationship";
+      } else if (chosenValue.action === "revertMedium") {
+        return `set medium to "${chosenValue.chosenValue}"`;
+      } else if (chosenValue.value !== undefined) {
+        return `"${chosenValue.value}"`;
+      } else if (typeof chosenValue === "string" || typeof chosenValue === "number") {
+        return `"${chosenValue}"`;
+      }
+      return JSON.stringify(chosenValue);
+    } catch {
+      return String(chosenValue);
+    }
+  };
 
   // Helper to get conflict values for ConcurrentAttributeEdit
   const getConflictValues = (conflictId: string): Array<{ value: any; editedBy: string }> => {
@@ -457,8 +376,52 @@ export function NotificationCenter() {
 
   return (
     <div className="ce-notification-center">
-      {items.map((it) => (
+      {items.map((it) => {
+        // Check if this conflict has been resolved
+        const resolution = it.conflictId ? getConflictResolution(it.conflictId) : null;
+        
+        if (resolution?.resolved || (it.kind === String(ConflictKind.ConcurrentAttributeEdit) && graph?.conflicts.get(it.conflictId)?.status?.value === 'resolved')) {
+          // Show resolved state instead of original content
+          const conflict = graph?.conflicts.get(it.conflictId);
+          const winningValue = conflict?.winningValue?.value;
+          const resolvedBy = winningValue?.resolvedBy ?? conflict?.resolvedBy?.value ?? "someone";
+          const chosenValue = winningValue?.chosenValue ?? winningValue;
+          const keyHint = winningValue?.key ?? "";
+          return (
+            <div key={it.id} className="ce-notification ce-notification-resolved">
+              <button
+                className="ce-notification-dismiss"
+                onClick={() => {
+                  if (it.conflictId) dismissedResolved.current.add(it.conflictId);
+                  setItems((s) => s.filter((x) => x.id !== it.id));
+                }}
+                title="Dismiss"
+              >
+                ×
+              </button>
+              <div className="ce-notification-title">✓ Resolved</div>
+              <div className="ce-notification-message">
+                This issue has been resolved by <strong>{resolvedBy}</strong>
+                {chosenValue && (
+                  <span className="ce-resolution-value">
+                    <br />Chosen: {formatChosenValue(chosenValue, keyHint || it.keyHint || "")}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        }
+        
+        // Show original notification with options
+        return (
         <div key={it.id} className="ce-notification">
+          <button
+            className="ce-notification-dismiss"
+            onClick={() => setItems((s) => s.filter((x) => x.id !== it.id))}
+            title="Dismiss"
+          >
+            ×
+          </button>
           <div className="ce-notification-title">{it.title}</div>
           <div className="ce-notification-message">{it.message}</div>
           {it.conflictId && it.kind === String(ConflictKind.DanglingReference) ? (
@@ -496,6 +459,55 @@ export function NotificationCenter() {
               </button>
             </div>
           ) : null}
+          {/* Feed Medium Mismatch - two options: delete feeds or revert medium */}
+          {it.conflictId && it.kind === String(ConflictKind.FeedMediumMismatch) && it.candidates?.[0] ? (
+            <div className="ce-notification-actions ce-attr-conflict-actions">
+              <button
+                className="ce-attr-choice-btn"
+                onClick={async () => {
+                  try {
+                    const ok = await resolveConflictAction?.(it.conflictId as string, "deleteFeeds");
+                    if (!ok) return;
+                    setItems((s) => s.filter((x) => x.id !== it.id));
+                  } catch (e) {
+                    console.warn("resolveConflictAction deleteFeeds failed:", e);
+                  }
+                }}
+              >
+                Delete feeds relationship
+              </button>
+              <button
+                className="ce-attr-choice-btn"
+                onClick={async () => {
+                  try {
+                    // revertMedium: set source outputMedium = target inputMedium
+                    const ok = await resolveConflictAction?.(it.conflictId as string, `revertMedium:useTarget`);
+                    if (!ok) return;
+                    setItems((s) => s.filter((x) => x.id !== it.id));
+                  } catch (e) {
+                    console.warn("resolveConflictAction revertMedium failed:", e);
+                  }
+                }}
+              >
+                Set source to "{it.candidates[0].tgtIn}"
+              </button>
+              <button
+                className="ce-attr-choice-btn"
+                onClick={async () => {
+                  try {
+                    // revertMedium: set target inputMedium = source outputMedium
+                    const ok = await resolveConflictAction?.(it.conflictId as string, `revertMedium:useSource`);
+                    if (!ok) return;
+                    setItems((s) => s.filter((x) => x.id !== it.id));
+                  } catch (e) {
+                    console.warn("resolveConflictAction revertMedium failed:", e);
+                  }
+                }}
+              >
+                Set target to "{it.candidates[0].srcOut}"
+              </button>
+            </div>
+          ) : null}
           {it.conflictId && it.kind === String(ConflictKind.ConcurrentAttributeEdit) ? (
             <div className="ce-notification-actions ce-attr-conflict-actions">
               {getConflictValues(it.conflictId).map((cv, idx) => (
@@ -510,6 +522,7 @@ export function NotificationCenter() {
                         `chooseValue:${JSON.stringify(cv.value)}`
                       );
                       if (!ok) return;
+                      if (it.conflictId) dismissedResolved.current.add(it.conflictId);
                       setItems((s) => s.filter((x) => x.id !== it.id));
                     } catch (e) {
                       // eslint-disable-next-line no-console
@@ -552,8 +565,141 @@ export function NotificationCenter() {
               ))}
             </div>
           ) : null}
+          {/* Semantic pair conflicts (pair:dims, pair:nameDesc, pair:valueUnit) */}
+          {it.conflictId && it.kind === String(ConflictKind.SemanticallyRelatedAttributes) && it.keyHint?.startsWith("pair:") && it.candidates && it.candidates.length >= 2 ? (
+            <div className="ce-notification-actions ce-attr-conflict-actions">
+              {(() => {
+                const pairType = it.keyHint?.slice(5); // "dims", "nameDesc", "valueUnit"
+                const c0 = it.candidates[0];
+                const c1 = it.candidates[1];
+                
+                if (pairType === "dims") {
+                  // ...existing code...
+                  const allOptions = [
+                    { label: `W: ${c0?.width}, H: ${c0?.height}`, value: { width: c0?.width, height: c0?.height, unit: c0?.unit ?? c1?.unit } },
+                    { label: `W: ${c1?.width}, H: ${c1?.height}`, value: { width: c1?.width, height: c1?.height, unit: c0?.unit ?? c1?.unit } },
+                    { label: `W: ${c0?.width}, H: ${c1?.height}`, value: { width: c0?.width, height: c1?.height, unit: c0?.unit ?? c1?.unit } },
+                    { label: `W: ${c1?.width}, H: ${c0?.height}`, value: { width: c1?.width, height: c0?.height, unit: c0?.unit ?? c1?.unit } },
+                  ];
+                  return allOptions.map((opt, idx) => (
+                    <button
+                      key={idx}
+                      className="ce-attr-choice-btn"
+                      onClick={async () => {
+                        try {
+                          const ok = await resolveConflictAction?.(it.conflictId as string, `choosePairValue:${it.keyHint}:${JSON.stringify(opt.value)}`);
+                          if (!ok) return;
+                          setItems((s) => s.filter((x) => x.id !== it.id));
+                        } catch (e) {
+                          console.warn("resolveConflictAction choosePairValue failed:", e);
+                        }
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ));
+                }
+                
+                if (pairType === "nameDesc") {
+                  // ...existing code...
+                  const allOptions = [
+                    { label: `Name: "${c0?.name}", Desc: "${c0?.description}"`, value: { name: c0?.name, description: c0?.description } },
+                    { label: `Name: "${c1?.name}", Desc: "${c1?.description}"`, value: { name: c1?.name, description: c1?.description } },
+                    { label: `Name: "${c0?.name}", Desc: "${c1?.description}"`, value: { name: c0?.name, description: c1?.description } },
+                    { label: `Name: "${c1?.name}", Desc: "${c0?.description}"`, value: { name: c1?.name, description: c0?.description } },
+                  ];
+                  return allOptions.map((opt, idx) => (
+                    <button
+                      key={idx}
+                      className="ce-attr-choice-btn"
+                      onClick={async () => {
+                        try {
+                          const ok = await resolveConflictAction?.(it.conflictId as string, `choosePairValue:${it.keyHint}:${JSON.stringify(opt.value)}`);
+                          if (!ok) return;
+                          setItems((s) => s.filter((x) => x.id !== it.id));
+                        } catch (e) {
+                          console.warn("resolveConflictAction choosePairValue failed:", e);
+                        }
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ));
+                }
+                
+                // Support all valueUnit conflicts (e.g., pair:valueUnit:width, pair:valueUnit:height)
+                if (pairType.startsWith("valueUnit")) {
+                  return [
+                    <button
+                      key="keep-value"
+                      className="ce-attr-choice-btn"
+                      onClick={async () => {
+                        try {
+                          const ok = await resolveConflictAction?.(it.conflictId as string, `choosePairValue:${it.keyHint}:${JSON.stringify({ value: c0?.value, unit: c1?.unit })}`);
+                          if (!ok) return;
+                          setItems((s) => s.filter((x) => x.id !== it.id));
+                        } catch (e) {
+                          console.warn("resolveConflictAction choosePairValue failed:", e);
+                        }
+                      }}
+                    >
+                      Keep value: {c0?.value}
+                    </button>,
+                    <button
+                      key="keep-unit"
+                      className="ce-attr-choice-btn"
+                      onClick={async () => {
+                        try {
+                          const ok = await resolveConflictAction?.(it.conflictId as string, `choosePairValue:${it.keyHint}:${JSON.stringify({ value: c1?.value, unit: c0?.unit })}`);
+                          if (!ok) return;
+                          setItems((s) => s.filter((x) => x.id !== it.id));
+                        } catch (e) {
+                          console.warn("resolveConflictAction choosePairValue failed:", e);
+                        }
+                      }}
+                    >
+                      Keep unit: {c0?.unit}
+                    </button>,
+                    <button
+                      key="keep-both"
+                      className="ce-attr-choice-btn"
+                      onClick={async () => {
+                        try {
+                          const ok = await resolveConflictAction?.(it.conflictId as string, `choosePairValue:${it.keyHint}:${JSON.stringify({ value: c0?.value, unit: c0?.unit })}`);
+                          if (!ok) return;
+                          setItems((s) => s.filter((x) => x.id !== it.id));
+                        } catch (e) {
+                          console.warn("resolveConflictAction choosePairValue failed:", e);
+                        }
+                      }}
+                    >
+                      Keep both: {c0?.value}, {c0?.unit}
+                    </button>,
+                    <button
+                      key="keep-neither"
+                      className="ce-attr-choice-btn"
+                      onClick={async () => {
+                        try {
+                          const ok = await resolveConflictAction?.(it.conflictId as string, `choosePairValue:${it.keyHint}:${JSON.stringify({ value: c1?.value, unit: c1?.unit })}`);
+                          if (!ok) return;
+                          setItems((s) => s.filter((x) => x.id !== it.id));
+                        } catch (e) {
+                          console.warn("resolveConflictAction choosePairValue failed:", e);
+                        }
+                      }}
+                    >
+                      Keep neither: {c1?.value}, {c1?.unit}
+                    </button>
+                  ];
+                }
+                
+                return null;
+              })()}
+            </div>
+          ) : null}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

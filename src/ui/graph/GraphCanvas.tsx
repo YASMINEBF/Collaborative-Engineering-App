@@ -251,7 +251,9 @@ function InnerCanvas(props: {
         }
       }
 
-      const id = `rel-${Date.now()}`;
+      // Generate a collision-proof relationship ID
+      const randomPart = Math.random().toString(36).slice(2, 10);
+      const id = `rel-${Date.now()}-${randomPart}`;
       createRelationship(
         graph,
         id,

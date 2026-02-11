@@ -30,7 +30,7 @@ function ensureSemanticConflict(
   } catch {}
 
   if (!existingId) {
-    const id = `conf-sem-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const id = `conf-sem-${compId}-${keyHint}.toString(16).slice(2)}`;
     graph.conflicts.set(id as any, ConflictKind.SemanticallyRelatedAttributes);
     const c = graph.conflicts.get(id as any);
     if (!c) return;
@@ -41,22 +41,7 @@ function ensureSemanticConflict(
     c.createdBy.value = currentUserId;
     c.createdAt.value = Date.now();
     c.status.value = "open";
-
-    try {
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("ce:notification", {
-            detail: {
-              type: "notify",
-              title: "Semantic attribute conflict",
-              message: `Conflicting values for ${String(compId)} (${keyHint})`,
-              compId: String(compId),
-              key: keyHint,
-            },
-          })
-        );
-      }
-    } catch {}
+    // NotificationCenter scans conflicts directly, no need for window event
   } else {
     // Conflict already exists - only update if candidates actually changed
     const c = graph.conflicts.get(existingId as any);

@@ -54,8 +54,8 @@ export function resolveFeedMediumConflicts(graph: CEngineeringGraph, currentUser
           } catch {}
 
           if (!already) {
-            // Create a conflict entry describing the mismatch
-            const id = `conf-fm-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            // Deterministic conflict ID: one per relationship
+            const id = `conf-fm-${relId}`;
             graph.conflicts.set(id, ConflictKind.FeedMediumMismatch);
             const c = graph.conflicts.get(id);
             if (c) {
@@ -99,7 +99,8 @@ export function resolveFeedMediumConflicts(graph: CEngineeringGraph, currentUser
           } catch {}
 
           if (!already) {
-            const id = `conf-fm-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            // Deterministic conflict ID: one per relationship
+            const id = `conf-fm-${relId}`;
             graph.conflicts.set(id, ConflictKind.FeedMediumMismatch);
             const c = graph.conflicts.get(id);
             if (c) {

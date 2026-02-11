@@ -109,8 +109,10 @@ export function resolveHasPartCycles(graph: CEngineeringGraph, currentUserId = "
 
         if (already) continue;
 
-        const id = `conf-cycle-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        graph.conflicts.set(id, ConflictKind.CycleDetected);
+        const relIds = Array.from(cycleSet).map(String).sort(); // stable ordering
+const id = `conf-cycle-${relIds.join("|")}`;            // deterministic id
+graph.conflicts.set(id, ConflictKind.CycleDetected);
+
         const c = graph.conflicts.get(id);
         if (!c) continue;
 

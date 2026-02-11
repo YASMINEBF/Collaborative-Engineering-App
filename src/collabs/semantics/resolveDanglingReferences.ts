@@ -19,13 +19,18 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
     }
   };
 
-  const makeConflictId = (nodeId: string): string => `dangling::node::${nodeId}`;
+  // Each edge pointing to a missing node gets its own conflictId
+  const makeConflictId = (nodeId: string, edgeId: string): string => `dangling::node::${nodeId}::edge::${edgeId}`;
 
-  // Check if user chose "deleteBoth" for this node
+  // Check if user chose "deleteBoth" for this node (any edge)
   const wasNodeExplicitlyDeleted = (nodeId: string): boolean => {
     try {
-      const c = graph.conflicts.get(makeConflictId(nodeId));
-      return c?.status?.value === "resolved" && c?.resolution?.value === "deleteBoth";
+      for (const [conflictId, c] of graph.conflicts.entries?.() ?? []) {
+        if (conflictId.startsWith(`dangling::node::${nodeId}::edge::`) && c?.status?.value === "resolved" && c?.resolution?.value === "deleteBoth") {
+          return true;
+        }
+      }
+      return false;
     } catch {
       return false;
     }
@@ -56,21 +61,7 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
     return true;
   };
 
-  // Get LIVE edges pointing to this node
-  const getLiveEdgesForNode = (nodeId: string): string[] => {
-    const edges: string[] = [];
-    for (const rel of graph.relationships.values()) {
-      try {
-        const relId = String(rel.id?.value ?? rel.id);
-        const src = rel.sourceId?.value;
-        const tgt = rel.targetId?.value;
-        if (src === nodeId || tgt === nodeId) {
-          edges.push(relId);
-        }
-      } catch {}
-    }
-    return edges;
-  };
+  // (Removed unused getLiveEdgesForNode)
 
   const getExistingConflict = (conflictId: string) => {
     try {
@@ -82,29 +73,21 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
     }
   };
 
-  const createOrReopenConflict = (nodeId: string, edgeIds: string[], deletedBy?: string) => {
-    const conflictId = makeConflictId(nodeId);
+  const createOrReopenConflict = (nodeId: string, edgeId: string, deletedBy?: string) => {
+    const conflictId = makeConflictId(nodeId, edgeId);
     const existing = getExistingConflict(conflictId);
-    
     // Already open - don't touch
     if (existing?.status === "open") return;
-    
     // User chose delete - respect it
     if (existing?.status === "resolved" && existing?.resolution === "deleteBoth") return;
-
     // Create or reopen
     if (!existing) {
       graph.conflicts.set(conflictId, ConflictKind.DanglingReference);
     }
-    
     const c = graph.conflicts.get(conflictId);
     if (!c) return;
-
     c.entityRefs.add(String(nodeId));
-    for (const edgeId of edgeIds) {
-      c.entityRefs.add(edgeId);
-    }
-
+    c.entityRefs.add(edgeId);
     c.winningValue.value = deletedBy ? { intendedDeletionBy: deletedBy } : null;
     c.losingValues.value = [{ missingId: nodeId, tombstoned: true }];
     c.createdBy.value = currentUserId;
@@ -114,31 +97,22 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
 
   // ========== MAIN LOGIC ==========
   
-  const tombstonedNodes = new Set<string>();
-
-  // Find nodes that are missing but referenced by live edges
+  // For each edge, if it points to a missing node, create a unique conflict for (node, edge)
   for (const rel of graph.relationships.values()) {
     try {
+      const relId = String(rel.id?.value ?? rel.id);
       const srcId = String(rel.sourceId?.value ?? "");
       const tgtId = String(rel.targetId?.value ?? "");
-
       for (const nodeId of [srcId, tgtId]) {
         if (!nodeId) continue;
         const exists = !!graph.components.get(nodeId);
         const isDeleted = !exists && getDeletionRecord(nodeId);
-        
         if (isDeleted && !wasNodeExplicitlyDeleted(nodeId)) {
           ensureTombstone(nodeId);
-          tombstonedNodes.add(nodeId);
+          const rec = getDeletionRecord(nodeId);
+          createOrReopenConflict(nodeId, relId, rec?.deletedBy);
         }
       }
     } catch {}
-  }
-
-  // Create conflicts for tombstoned nodes
-  for (const nodeId of tombstonedNodes) {
-    const edges = getLiveEdgesForNode(nodeId);
-    const rec = getDeletionRecord(nodeId);
-    createOrReopenConflict(nodeId, edges, rec?.deletedBy);
   }
 }
