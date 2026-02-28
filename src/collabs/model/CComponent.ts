@@ -54,7 +54,7 @@ export abstract class CComponent extends collabs.CObject {
       (i) => new collabs.CVar(i, "")
     );
 
-    // ✅ NEW tombstone vars
+    // tombstone vars
     this.isDeleted = this.registerCollab(
       "isDeleted",
       (i) => new collabs.CVar(i, false)

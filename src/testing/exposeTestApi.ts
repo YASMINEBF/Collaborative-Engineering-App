@@ -102,7 +102,7 @@ export function exposeTestApi({ graph, doc, userId }: Setup) {
       return c;
     },
 
-    // ✅ Count feed-medium mismatch conflicts that reference a SPECIFIC relationship id
+    //  Count feed-medium mismatch conflicts that reference a SPECIFIC relationship id
     getFeedMediumMismatchCountForRel: (relId: string) => {
       let c = 0;
       const relKey = String(relId);
@@ -122,7 +122,7 @@ export function exposeTestApi({ graph, doc, userId }: Setup) {
       return c;
     },
 
-    // ✅ Remove any feed-medium mismatch conflicts that reference a SPECIFIC relationship id
+    //  Remove any feed-medium mismatch conflicts that reference a SPECIFIC relationship id
     clearFeedMediumMismatchForRel: (relId: string) => {
       const relKey = String(relId);
       try {

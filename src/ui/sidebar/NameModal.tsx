@@ -12,7 +12,7 @@ type Props = {
   error?: string;
   onChangeValue?: () => void;
 
-  // ✅ show this only when creating a port
+  // show this only when creating a port
   showPortType?: boolean;
   initialPortType?: PortType;
   onConfirm: (payload: { name: string; portType?: PortType }) => void;

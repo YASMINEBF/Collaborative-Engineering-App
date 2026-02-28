@@ -33,7 +33,7 @@ export type RelationshipSetArgs = [
 ];
 export type ConflictSetArgs = [kind: ConflictKind];
 
-// ✅ Store enough data to resurrect a tombstone component later (only on concurrency)
+//  Store enough data to resurrect a tombstone component later (only on concurrency)
 export type DeletionRecord = {
   deletedBy: string;
   deletedAt: number;
@@ -67,13 +67,13 @@ export class CEngineeringGraph extends collabs.CObject {
   readonly feedsByPortMedium: collabs.CValueMap<string, RelId>;
   readonly parentByChild: collabs.CValueMap<ComponentId, ComponentId>;
 
-  // ✅ Deletion log for concurrency (delete vs edge-create):
+  //  Deletion log for concurrency (delete vs edge-create):
   // if an edge arrives referencing a deleted node, we can resurrect the node as a tombstone
   readonly deletionLog: collabs.CValueMap<ComponentId, DeletionRecord>;
   // Snapshot log for deleted relationships so we can restore them during concurrent scenarios
   readonly relationshipDeletionLog: collabs.CValueMap<RelId, any>;
   
-  // ✅ NEW: Maps nodeId -> Set of relationship snapshots that were deleted when that node was deleted.
+  //  Maps nodeId -> Set of relationship snapshots that were deleted when that node was deleted.
   // This is more robust than embedding in deletionLog because:
   // 1. It's a CValueSet, so concurrent adds don't conflict (set union semantics)
   // 2. We can query by nodeId directly
@@ -163,7 +163,7 @@ export class CEngineeringGraph extends collabs.CObject {
       (i) => new collabs.CValueMap<ComponentId, ComponentId>(i)
     );
 
-    // ✅ NEW: Deletion log now stores enough metadata to re-create a tombstone node for UI
+    // Deletion log now stores enough metadata to re-create a tombstone node for UI
     this.deletionLog = this.registerCollab(
       "deletionLog",
       (i) => new collabs.CValueMap<ComponentId, DeletionRecord>(i)
@@ -174,7 +174,7 @@ export class CEngineeringGraph extends collabs.CObject {
       (i) => new collabs.CValueMap<RelId, any>(i)
     );
 
-    // ✅ NEW: Track relationships deleted due to node deletion
+    //  Track relationships deleted due to node deletion
     // Key: "{nodeId}::{relId}", Value: JSON stringified relationship snapshot
     this.deletedRelationshipsByNode = this.registerCollab(
       "deletedRelationshipsByNode",

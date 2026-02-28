@@ -1,26 +1,36 @@
 import json
+import sys
 import matplotlib.pyplot as plt
 
-PATH = "benchmark-results/feedMediumMismatch.scaling.N1-200.json"
+if len(sys.argv) < 2:
+    print("Usage: python3 plot_scaling_curve_sampled.py <json_file>")
+    sys.exit(1)
 
-with open(PATH) as f:
+path = sys.argv[1]
+
+with open(path, "r", encoding="utf-8") as f:
     data = json.load(f)
 
 series = data["series"]
 
-Ns = [row["N"] for row in series if row["afterFixMs"] is not None]
-detect = [row["detectMs"] for row in series if row["afterFixMs"] is not None]
-after = [row["afterFixMs"] for row in series if row["afterFixMs"] is not None]
+# Extract sampled N and median values
+Ns = [row["N"] for row in series]
+detect = [row["detectMs"] for row in series]
+after = [row["afterFixMs"] for row in series]
 
-plt.figure()
-plt.plot(Ns, detect, marker="o", markersize=2, label="detect")
-plt.plot(Ns, after, marker="o", markersize=2, label="after-fix")
+plt.figure(figsize=(8, 5))
 
+plt.plot(Ns, detect, marker="o", linewidth=2, label="detect (median)")
+plt.plot(Ns, after, marker="o", linewidth=2, label="after-fix (median)")
+
+plt.title("FeedMediumMismatch Scaling (Browser, 2 Replicas)")
 plt.xlabel("Number of nodes (N)")
 plt.ylabel("Resolver latency (ms)")
-plt.title("FeedMediumMismatch scaling (single conflict, 1 run per N)")
-plt.grid(True)
+plt.grid(True, alpha=0.3)
 plt.legend()
 
-plt.savefig("feedMediumMismatch_scaling.png", dpi=150)
+plt.tight_layout()
+plt.savefig("benchmark-results/feedMediumMismatch.scaling.sampledN.median5.png", dpi=150)
 plt.show()
+
+print("Saved plot to benchmark-results/feedMediumMismatch.scaling.sampledN.median5.png")

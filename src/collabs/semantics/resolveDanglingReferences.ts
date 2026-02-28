@@ -95,7 +95,6 @@ export default function resolveDanglingReferences(graph: CEngineeringGraph, curr
     c.status.value = "open";
   };
 
-  // ========== MAIN LOGIC ==========
   
   // For each edge, if it points to a missing node, create a unique conflict for (node, edge)
   for (const rel of graph.relationships.values()) {

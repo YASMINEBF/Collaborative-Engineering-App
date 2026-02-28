@@ -14,7 +14,7 @@ export class CRelationship extends collabs.CObject {
   readonly targetHandle: collabs.CVar<string | null>;
   readonly medium: collabs.CVar<Medium | null>;
 
-  // ✅ NEW: useful for concurrency checks (delete vs create)
+  // useful for concurrency checks (delete vs create)
   readonly createdAt: collabs.CVar<number>;
   readonly createdBy: collabs.CVar<string>;
 
@@ -51,7 +51,7 @@ export class CRelationship extends collabs.CObject {
     // safe during load/receive
     this.medium = this.registerCollab("medium", (i) => new collabs.CVar<Medium | null>(i, medium));
 
-    // ✅ NEW: safe during load/receive
+    // safe during load/receive
     this.createdAt = this.registerCollab("createdAt", (i) => new collabs.CVar<number>(i, createdAt));
     this.createdBy = this.registerCollab("createdBy", (i) => new collabs.CVar<string>(i, createdBy));
   }

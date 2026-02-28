@@ -18,7 +18,7 @@ export type CVarLike<T> = { value: T };
 export type CComponentLike = {
   id: CVarLike<string> | string;
 
-  // In your model: "equipment" | "port"
+  // In the model: "equipment" | "port"
   type?: CVarLike<string> | string;
 
   uniqueName?: CVarLike<string> | string;
@@ -38,14 +38,14 @@ export type CComponentLike = {
 export type CRelationshipLike = {
   id: CVarLike<string> | string;
 
-  // In your model these are required
+  // In the model these are required
   sourceId: CVarLike<string> | string;
   targetId: CVarLike<string> | string;
 
   kind?: CVarLike<RelationshipKind> | RelationshipKind;
   medium?: CVarLike<Medium | null> | (Medium | null);
 
-  // optional, if you store it
+  // optional, if stored 
   type?: CVarLike<string> | string;
 };
 
@@ -123,7 +123,7 @@ export function cComponentToReactFlowNode(c: CComponentLike): Node | null {
       label,
       componentType: rawType,
 
-      // UI defaults (optional)
+      // UI defaults (optional) this is currently not used since we don't locking :) 
       collaboratorSelection: undefined,
       lockInfo: {
         isLocked: false,
@@ -152,16 +152,16 @@ export function cRelationshipToReactFlowEdge(r: CRelationshipLike): Edge | null 
   const sourceHandle = readVar<string | null>((r as any).sourceHandle, null);
   const targetHandle = readVar<string | null>((r as any).targetHandle, null);
 
-  // ✅ read medium from the relationship
+  //  read medium from the relationship
   const medium = readVar<Medium | null>((r as any).medium, null);
 
-    // ✅ label: "feeds (Water)" only for feeds
+    //  label: "feeds (Water)" only for feeds
     const label =
       kindClass === "feeds" && medium
         ? `feeds (${String(medium)})`
         : String(kind);
 
-  // ✅ Calculate offset for bidirectional edges
+  //  Calculate offset for bidirectional edges
   const needsOffset =
     source > target ||
     (source === target && (sourceHandle || "") > (targetHandle || ""));

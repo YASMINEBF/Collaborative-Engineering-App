@@ -1,43 +1,30 @@
+# src/testing/scripts/plot_feedMismatch_multiconflict_headless_detect_avg.py
 import json
+import sys
 import matplotlib.pyplot as plt
 
-INPUT_JSON = "benchmark-results/feedMediumMismatch.multiconflict.headless.json"
-OUTPUT_PNG = "benchmark-results/feedMediumMismatch.multiconflict.headless.png"
+if len(sys.argv) < 2:
+    print("Usage: python3 src/testing/scripts/plot_feedMismatch_multiconflict_headless_detect_avg.py <json_file>")
+    sys.exit(1)
 
-with open(INPUT_JSON, "r", encoding="utf-8") as f:
+with open(sys.argv[1], "r") as f:
     data = json.load(f)
 
 series = data["series"]
 
 C = [row["conflicts"] for row in series]
 
-det_p50 = [row["detect"]["p50Ms"] for row in series]
-det_p95 = [row["detect"]["p95Ms"] for row in series]
+detect_avg = [row["detect"]["avgMs"] for row in series]
+detect_p50 = [row["detect"]["p50Ms"] for row in series]
 
-fix_p50 = [row["afterFix"]["p50Ms"] for row in series]
-fix_p95 = [row["afterFix"]["p95Ms"] for row in series]
+plt.figure(figsize=(9, 5))
+plt.plot(C, detect_avg, marker="o", label="detect avg (ms)")
+plt.plot(C, detect_p50, marker="o", label="detect p50/median (ms)")
 
-base_p50 = [row["baseline"]["p50Ms"] for row in series]
-base_p95 = [row["baseline"]["p95Ms"] for row in series]
-
-plt.figure(figsize=(8, 5))
-
-plt.plot(C, base_p50, marker="o", label="baseline p50")
-plt.plot(C, det_p50, marker="o", label="detect p50")
-plt.plot(C, fix_p50, marker="o", label="after-fix p50")
-
-plt.plot(C, base_p95, linestyle="--", alpha=0.6, marker="o", label="baseline p95")
-plt.plot(C, det_p95, linestyle="--", alpha=0.6, marker="o", label="detect p95")
-plt.plot(C, fix_p95, linestyle="--", alpha=0.6, marker="o", label="after-fix p95")
-
-plt.title("FeedMediumMismatch: latency vs number of conflicts (headless, fixed graph)")
-plt.xlabel("Number of injected mismatches (C)")
-plt.ylabel("Resolver latency (ms)")
+plt.title("FeedMediumMismatch (headless multiconflict): Detect latency vs #mismatches")
+plt.xlabel("Injected mismatches C (≈ number of open FeedMediumMismatch conflicts)")
+plt.ylabel("Resolver time per run (ms)")
 plt.grid(True)
 plt.legend()
 plt.tight_layout()
-
-plt.savefig(OUTPUT_PNG, dpi=150)
 plt.show()
-
-print("Saved plot to:", OUTPUT_PNG)

@@ -1,4 +1,3 @@
-// src/collabs/provider/CollabProvider.tsx
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createLocalDoc } from "./docSetup";
 import startConflictResolver from "../semantics/conflictResolver";
@@ -220,7 +219,7 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
                   // Delete edges first
                   for (const id of edgeIdsToHardDelete) {
                     try {
-                      deleteRelationship(g, id as any, { recordSnapshot: false }); // Don't record - we're purging
+                      deleteRelationship(g, id as any, { recordSnapshot: false }); // Don't record 
                     } catch {}
                   }
                   
@@ -666,7 +665,7 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
     };
   }, []);
 
-  // ✅ E2E / testing hook: expose test API ONLY when enabled + ready
+  //  E2E / testing hook: expose test API ONLY when enabled + ready
   useEffect(() => {
     if (!isE2EEnabled()) return;
     if (state.status !== "ready" || !state.graph || !state.doc) return;

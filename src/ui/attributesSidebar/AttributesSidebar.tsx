@@ -71,7 +71,7 @@ export default function AttributesSidebar({
 
   /**
    * Canonical key used by the resolver for value+unit pairs.
-   * (This MUST match what your resolver scans.)
+   * (This MUST match what resolver scans.)
    */
   const valueUnitKey = useCallback((k: string) => `pair:valueUnit:${k}`, []);
 

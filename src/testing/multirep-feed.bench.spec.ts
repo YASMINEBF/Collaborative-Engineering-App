@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test } from "@playwright/test";
 import fs from "fs";
 import path from "path";
 
@@ -9,41 +9,59 @@ declare global {
 }
 
 /**
- * Deterministic fixture generator:
+ * Small deterministic fixture:
  * - N equipment nodes: c0..c{N-1}
- * - If N>=2: exactly ONE feeds relationship e0: c0 -> c1
- * - By default: output/input = Water/Water for all nodes
- * - Mismatch toggling is done in the test by editing c1.inputMedium.
+ * - Star feeds edges: c0 -> c1..c{N-1}  (N-1 edges)
+ * - Extra stable edges: ~extraEdges more feeds edges (kept consistent)
+ * - All nodes start Water/Water
  */
-function makeGraph(N: number) {
+function makeSmallGraph(N = 60, extraEdges = 60) {
   const nodes: any[] = [];
   for (let i = 0; i < N; i++) {
     nodes.push({
       id: `c${i}`,
       type: "equipment",
       name: `node-${i}`,
-      position: { x: i * 10, y: 0 },
-      attrs: {
-        inputMedium: "Water",
-        outputMedium: "Water",
-      },
+      position: { x: (i % 12) * 50, y: Math.floor(i / 12) * 60 },
+      attrs: { inputMedium: "Water", outputMedium: "Water" },
     });
   }
 
   const edges: any[] = [];
-  if (N >= 2) {
+  let eid = 0;
+
+  // Star edges: predictable mismatches when we edit c1..cK input
+  for (let i = 1; i < N; i++) {
     edges.push({
-      id: "e0",
+      id: `e${eid++}`,
       kind: "feeds",
       source: "c0",
-      target: "c1",
+      target: `c${i}`,
+      medium: null,
+    });
+  }
+
+  // Extra edges that we keep consistent to simulate more “realistic” graph size
+  for (let k = 0; k < extraEdges; k++) {
+    const src = (k * 17 + 3) % N;
+    let tgt = (k * 31 + 7) % N;
+    if (tgt === src) tgt = (tgt + 1) % N;
+
+    // avoid duplicating star edges (c0->ci)
+    if (src === 0 && tgt >= 1) continue;
+
+    edges.push({
+      id: `e${eid++}`,
+      kind: "feeds",
+      source: `c${src}`,
+      target: `c${tgt}`,
       medium: null,
     });
   }
 
   return {
     version: 1,
-    meta: { generatedAt: Date.now(), N },
+    meta: { generatedAt: Date.now(), N, edges: edges.length },
     nodes,
     edges,
   };
@@ -55,13 +73,22 @@ function median(xs: number[]) {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-test.describe("BENCH scaling: FeedMediumMismatch N=1..200 (single conflict)", () => {
-  // 200 sizes * 10 runs each => 2000 resolver runs + sync ticks
-  test.setTimeout(15 * 60_000);
+async function settleBoth(page1: any, page2: any) {
+  // “deliver + apply” in both directions:
+  await page1.evaluate(() => window.__CE_TEST_API__.flush?.());
+  await page2.evaluate(() => window.__CE_TEST_API__.flush?.());
+  await page1.evaluate(() => window.__CE_TEST_API__.flush?.());
+}
 
-  test("scaling curve (median of 10 runs per N)", async ({ browser }) => {
+test.describe("BENCH 2-replica: FeedMediumMismatch (small graph)", () => {
+  test.setTimeout(10 * 60_000);
+
+  test("fixed N=60, ~120 edges, 5 mismatches per iter -> CSV/JSON for plotting", async ({
+    browser,
+  }) => {
     const appUrl = process.env.APP_URL || "http://localhost:5173";
 
+    // Two independent “instances” of the app:
     const ctx1 = await browser.newContext();
     const ctx2 = await browser.newContext();
 
@@ -73,124 +100,141 @@ test.describe("BENCH scaling: FeedMediumMismatch N=1..200 (single conflict)", ()
 
     await Promise.all([page1.goto(appUrl), page2.goto(appUrl)]);
 
-    await page1.waitForFunction(() => (window as any).__CE_TEST_API__ !== undefined, null, { timeout: 30_000 });
-    await page2.waitForFunction(() => (window as any).__CE_TEST_API__ !== undefined, null, { timeout: 30_000 });
+    await Promise.all([
+      page1.waitForFunction(() => (window as any).__CE_TEST_API__ !== undefined, null, {
+        timeout: 30_000,
+      }),
+      page2.waitForFunction(() => (window as any).__CE_TEST_API__ !== undefined, null, {
+        timeout: 30_000,
+      }),
+    ]);
 
-    const K = 10; // runs per N
-    const series: Array<{ N: number; detectMs: number; afterFixMs: number | null }> = [];
+    const N = 60;
+    const extraEdges = 60; // star=59, total≈119
+    const g = makeSmallGraph(N, extraEdges);
 
-    for (let N = 1; N <= 200; N++) {
-      const g = makeGraph(N);
+    // Import once on page1; page2 should converge via sync.
+    const ok = await page1.evaluate((gg) => (window as any).__CE_TEST_API__.importGraph(gg), g);
+    if (!ok) throw new Error("importGraph failed");
 
-      // Import fresh graph (your importGraph should clear components/relationships/conflicts)
-      const ok = await page1.evaluate((gg) => (window as any).__CE_TEST_API__.importGraph(gg), g);
-      if (!ok) throw new Error(`importGraph failed for N=${N}`);
+    await settleBoth(page1, page2);
 
-      // Let both replicas settle
-      await page1.evaluate(() => window.__CE_TEST_API__.flush());
-      await page2.evaluate(() => window.__CE_TEST_API__.flush());
-      await page1.evaluate(() => window.__CE_TEST_API__.flush());
+    // We will intentionally mismatch only these targets each iteration:
+    const mismatchTargets = ["c1", "c2", "c3", "c4", "c5"]; // => expect 5 mismatches
+    const expectedConflicts = mismatchTargets.length;
 
-      // Defensive clear (in case an older importGraph is still in your build)
-      await page1.evaluate(() => window.__CE_TEST_API__.clearConflicts?.());
-      await page1.evaluate(() => window.__CE_TEST_API__.flush());
+    // Ensure clean start
+    await page1.evaluate((ids) => window.__CE_TEST_API__.bulkEditInput(ids, "Water"), mismatchTargets);
+    await settleBoth(page1, page2);
 
-      if (N < 2) {
-        // No relationship => no mismatch possible
-        const t = await page1.evaluate(() => window.__CE_TEST_API__.runFeedMediumResolverTimed("bench-detect"));
-        series.push({ N, detectMs: Number(t?.ms ?? 0), afterFixMs: null });
-        continue;
+    await page1.evaluate(() => window.__CE_TEST_API__.clearConflicts?.());
+    await settleBoth(page1, page2);
+
+    const WARMUP = 10;
+    const RUNS = 100;
+
+    const rows: Array<{
+      iter: number;
+      phase: "detect" | "afterfix";
+      page: 1 | 2;
+      ms: number;
+      conflicts: number;
+    }> = [];
+
+    // We time on both pages to show convergence + comparable compute cost
+    for (let i = 0; i < WARMUP + RUNS; i++) {
+      const measured = i >= WARMUP;
+      const iter = i - WARMUP;
+
+      // --- Introduce mismatches on page1 (simulating user edit on replica 1) ---
+      await page1.evaluate((ids) => window.__CE_TEST_API__.bulkEditInput(ids, "Steam"), mismatchTargets);
+      await settleBoth(page1, page2);
+
+      // --- Detect (timed) on BOTH replicas ---
+      const d1 = await page1.evaluate(() => window.__CE_TEST_API__.runFeedMediumResolverTimed("bench-detect-p1"));
+      const c1 = await page1.evaluate(() => window.__CE_TEST_API__.getFeedMediumMismatchCount());
+      const d2 = await page2.evaluate(() => window.__CE_TEST_API__.runFeedMediumResolverTimed("bench-detect-p2"));
+      const c2 = await page2.evaluate(() => window.__CE_TEST_API__.getFeedMediumMismatchCount());
+
+      // correctness check (don’t hide bugs):
+      // We expect at least the mismatches we created. (If your resolver can create >5 due to other structure, keep >=.)
+      if (c1 < expectedConflicts || c2 < expectedConflicts) {
+        const snap1 = await page1.evaluate(() => window.__CE_TEST_API__.snapshot?.());
+        const snap2 = await page2.evaluate(() => window.__CE_TEST_API__.snapshot?.());
+        throw new Error(
+          `detect: expected conflicts>=${expectedConflicts}, got page1=${c1}, page2=${c2}\n` +
+            `snap1=${JSON.stringify(snap1)}\n` +
+            `snap2=${JSON.stringify(snap2)}`
+        );
       }
 
-      const detectSamples: number[] = [];
-      const afterFixSamples: number[] = [];
+      // --- Fix mismatches on page1 (simulating resolution on replica 1) ---
+      await page1.evaluate((ids) => window.__CE_TEST_API__.bulkEditInput(ids, "Water"), mismatchTargets);
+      await settleBoth(page1, page2);
 
-      // Ensure our starting state is "no mismatch": c1.input = Water
-      await page1.evaluate(() => window.__CE_TEST_API__.bulkEditInput(["c1"], "Water"));
-      await page1.evaluate(() => window.__CE_TEST_API__.flush());
-      await page2.evaluate(() => window.__CE_TEST_API__.flush());
-      await page1.evaluate(() => window.__CE_TEST_API__.flush());
+      // --- Detect-after-fix (timed) on BOTH replicas ---
+      const f1 = await page1.evaluate(() => window.__CE_TEST_API__.runFeedMediumResolverTimed("bench-afterfix-p1"));
+      const c1a = await page1.evaluate(() => window.__CE_TEST_API__.getFeedMediumMismatchCount());
+      const f2 = await page2.evaluate(() => window.__CE_TEST_API__.runFeedMediumResolverTimed("bench-afterfix-p2"));
+      const c2a = await page2.evaluate(() => window.__CE_TEST_API__.getFeedMediumMismatchCount());
 
-      // Ensure no conflict for e0
-      await page1.evaluate(() => window.__CE_TEST_API__.clearFeedMediumMismatchForRel?.("e0"));
-      await page1.evaluate(() => window.__CE_TEST_API__.runFeedMediumResolverTimed("warmup"));
-      const startCount = await page1.evaluate(() => window.__CE_TEST_API__.getFeedMediumMismatchCountForRel?.("e0") ?? 0);
-      if (startCount !== 0) {
-        const snap = await page1.evaluate(() => window.__CE_TEST_API__.snapshot());
-        throw new Error(`N=${N}: expected 0 conflicts for e0 at start; got ${startCount}. Snapshot: ${JSON.stringify(snap)}`);
+      if (c1a !== 0 || c2a !== 0) {
+        const snap1 = await page1.evaluate(() => window.__CE_TEST_API__.snapshot?.());
+        const snap2 = await page2.evaluate(() => window.__CE_TEST_API__.snapshot?.());
+        throw new Error(
+          `afterfix: expected 0 conflicts, got page1=${c1a}, page2=${c2a}\n` +
+            `snap1=${JSON.stringify(snap1)}\n` +
+            `snap2=${JSON.stringify(snap2)}`
+        );
       }
 
-      for (let k = 0; k < K; k++) {
-        // --- Create exactly ONE mismatch (single conflict candidate): c1.input != c0.output ---
-        await page1.evaluate(() => window.__CE_TEST_API__.bulkEditInput(["c1"], "Steam"));
-
-        // settle delivery
-        await page1.evaluate(() => window.__CE_TEST_API__.flush());
-        await page2.evaluate(() => window.__CE_TEST_API__.flush());
-        await page1.evaluate(() => window.__CE_TEST_API__.flush());
-
-        // --- Detect (timed) ---
-        const detect = await page1.evaluate(() => window.__CE_TEST_API__.runFeedMediumResolverTimed("bench-detect"));
-        detectSamples.push(Number(detect?.ms ?? 0));
-
-        // correctness: conflict must exist for rel e0
-        const c1 = await page1.evaluate(() => window.__CE_TEST_API__.getFeedMediumMismatchCountForRel("e0"));
-        if (!(c1 > 0)) {
-          const snap = await page1.evaluate(() => window.__CE_TEST_API__.snapshot());
-          throw new Error(`N=${N}: expected conflict for e0 after detect; got ${c1}. Snapshot: ${JSON.stringify(snap)}`);
-        }
-
-        // --- Fix mismatch ---
-        await page1.evaluate(() => window.__CE_TEST_API__.bulkEditInput(["c1"], "Water"));
-
-        await page1.evaluate(() => window.__CE_TEST_API__.flush());
-        await page2.evaluate(() => window.__CE_TEST_API__.flush());
-        await page1.evaluate(() => window.__CE_TEST_API__.flush());
-
-        // --- Detect-after-fix (timed) ---
-        const afterFix = await page1.evaluate(() => window.__CE_TEST_API__.runFeedMediumResolverTimed("bench-afterfix"));
-        afterFixSamples.push(Number(afterFix?.ms ?? 0));
-
-        const c2 = await page1.evaluate(() => window.__CE_TEST_API__.getFeedMediumMismatchCountForRel("e0"));
-        if (c2 !== 0) {
-          const snap = await page1.evaluate(() => window.__CE_TEST_API__.snapshot());
-          throw new Error(`N=${N}: expected 0 conflicts for e0 after fix; got ${c2}. Snapshot: ${JSON.stringify(snap)}`);
-        }
-
-        // Extra safety: remove any duplicate conflicts for e0 so next iteration is clean
-        await page1.evaluate(() => window.__CE_TEST_API__.clearFeedMediumMismatchForRel?.("e0"));
-        await page1.evaluate(() => window.__CE_TEST_API__.flush());
+      if (measured) {
+        rows.push({ iter, phase: "detect", page: 1, ms: Number(d1?.ms ?? 0), conflicts: c1 });
+        rows.push({ iter, phase: "detect", page: 2, ms: Number(d2?.ms ?? 0), conflicts: c2 });
+        rows.push({ iter, phase: "afterfix", page: 1, ms: Number(f1?.ms ?? 0), conflicts: c1a });
+        rows.push({ iter, phase: "afterfix", page: 2, ms: Number(f2?.ms ?? 0), conflicts: c2a });
       }
-
-      series.push({
-        N,
-        detectMs: median(detectSamples),
-        afterFixMs: median(afterFixSamples),
-      });
     }
 
-    const out = {
-      invariant: "FeedMediumMismatch",
-      resolver: "resolveFeedMediumConflicts",
-      mode: "scaling_median10_per_N_single_conflict",
-      runsPerN: 10,
-      series,
+    // --- Summaries for plotting/reporting ---
+    function summarize(phase: "detect" | "afterfix", page: 1 | 2) {
+      const xs = rows.filter((r) => r.phase === phase && r.page === page).map((r) => r.ms);
+      return {
+        median: median(xs),
+        p95: [...xs].sort((a, b) => a - b)[Math.floor(xs.length * 0.95)],
+        n: xs.length,
+      };
+    }
+
+    const summary = {
+      graph: { nodes: g.nodes.length, edges: g.edges.length },
+      mismatchesPerIter: expectedConflicts,
+      warmup: WARMUP,
+      runs: RUNS,
+      stats: {
+        detect_p1: summarize("detect", 1),
+        detect_p2: summarize("detect", 2),
+        afterfix_p1: summarize("afterfix", 1),
+        afterfix_p2: summarize("afterfix", 2),
+      },
       timestamp: new Date().toISOString(),
     };
 
+    // --- Write outputs ---
     const outDir = path.join(process.cwd(), "benchmark-results");
     fs.mkdirSync(outDir, { recursive: true });
 
-    const outJson = path.join(outDir, "feedMediumMismatch.scaling.N1-200.median10.json");
-    fs.writeFileSync(outJson, JSON.stringify(out, null, 2), "utf-8");
+    const outJson = path.join(outDir, `feedMediumMismatch.2rep.N${N}.E${g.edges.length}.runs${RUNS}.json`);
+    fs.writeFileSync(outJson, JSON.stringify({ summary, rows }, null, 2), "utf-8");
 
-    const outCsv = path.join(outDir, "feedMediumMismatch.scaling.N1-200.median10.csv");
-    const csvLines = ["N,detectMs,afterFixMs"];
-    for (const row of series) csvLines.push(`${row.N},${row.detectMs},${row.afterFixMs ?? ""}`);
+    const outCsv = path.join(outDir, `feedMediumMismatch.2rep.N${N}.E${g.edges.length}.runs${RUNS}.csv`);
+    const header = "iter,phase,page,ms,conflicts";
+    const csvLines = [header, ...rows.map((r) => `${r.iter},${r.phase},${r.page},${r.ms},${r.conflicts}`)];
     fs.writeFileSync(outCsv, csvLines.join("\n"), "utf-8");
 
     console.log("Wrote:", outJson);
     console.log("Wrote:", outCsv);
+    console.log("Summary:", summary);
 
     await ctx1.close();
     await ctx2.close();

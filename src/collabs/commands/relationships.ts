@@ -49,7 +49,7 @@ function recordConflict(
 
 type DeleteRelationshipOpts = {
   deletedBy?: string;
-  recordSnapshot?: boolean; // ✅ default true
+  recordSnapshot?: boolean; //  default true
   isCascade?: boolean; // true if deleted as side-effect of node deletion
   cascadeFromNodeId?: string; // which node deletion caused this cascade
 };
@@ -61,7 +61,7 @@ export function deleteRelationship(graph: CEngineeringGraph, id: RelId, opts: De
 
   const recordSnapshot = opts.recordSnapshot ?? true;
 
-  // ✅ Snapshot edge BEFORE deleting (so we can restore on concurrent delete-vs-create)
+  // Snapshot edge BEFORE deleting (so we can restore on concurrent delete-vs-create)
   if (recordSnapshot) {
     try {
       // CRITICAL: Check if there's already an EXPLICIT delete record for this edge.
