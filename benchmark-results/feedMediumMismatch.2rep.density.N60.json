@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "mismatches": 1,
+      "medianDetectMs": 0.5
+    },
+    {
+      "mismatches": 5,
+      "medianDetectMs": 0.6000000014901161
+    },
+    {
+      "mismatches": 10,
+      "medianDetectMs": 0.8000000007450581
+    },
+    {
+      "mismatches": 20,
+      "medianDetectMs": 1.199999999254942
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "conflicts": 1,
+      "medianDetectMs": 0.10000000894069672
+    },
+    {
+      "conflicts": 5,
+      "medianDetectMs": 0.29999999701976776
+    },
+    {
+      "conflicts": 10,
+      "medianDetectMs": 0.5
+    },
+    {
+      "conflicts": 20,
+      "medianDetectMs": 1
+    }
+  ]
+}

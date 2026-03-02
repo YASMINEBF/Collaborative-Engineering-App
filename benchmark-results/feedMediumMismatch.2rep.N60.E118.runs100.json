@@ -1,0 +1,2836 @@
+{
+  "summary": {
+    "graph": {
+      "nodes": 60,
+      "edges": 118
+    },
+    "mismatchesPerIter": 5,
+    "warmup": 10,
+    "runs": 100,
+    "stats": {
+      "detect_p1": {
+        "median": 0.7000000001862645,
+        "p95": 1.3000000002793968,
+        "n": 100
+      },
+      "detect_p2": {
+        "median": 0.6999999997206032,
+        "p95": 1.3000000002793968,
+        "n": 100
+      },
+      "afterfix_p1": {
+        "median": 0.5,
+        "p95": 1,
+        "n": 100
+      },
+      "afterfix_p2": {
+        "median": 0.39999999990686774,
+        "p95": 0.7000000001862645,
+        "n": 100
+      }
+    },
+    "timestamp": "2026-02-13T12:16:54.260Z"
+  },
+  "rows": [
+    {
+      "iter": 0,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 0,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.8000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 0,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 1,
+      "conflicts": 0
+    },
+    {
+      "iter": 0,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 1,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 1,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 1,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 1,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 2,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 2,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.3999999999068677,
+      "conflicts": 10
+    },
+    {
+      "iter": 2,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 2,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 3,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 3,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 3,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 1,
+      "conflicts": 0
+    },
+    {
+      "iter": 3,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 0
+    },
+    {
+      "iter": 4,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 4,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 10
+    },
+    {
+      "iter": 4,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 4,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 5,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 5,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 5,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 5,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 6,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.8000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 6,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 6,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 6,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 7,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 7,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 7,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 7,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 8,
+      "phase": "detect",
+      "page": 1,
+      "ms": 2,
+      "conflicts": 10
+    },
+    {
+      "iter": 8,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.3999999999068677,
+      "conflicts": 10
+    },
+    {
+      "iter": 8,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 8,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 9,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.8000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 9,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 10
+    },
+    {
+      "iter": 9,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 9,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 10,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 10,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 10,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 10,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 11,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 11,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1,
+      "conflicts": 10
+    },
+    {
+      "iter": 11,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 1.1000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 11,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 0
+    },
+    {
+      "iter": 12,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 12,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.099999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 12,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 12,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 13,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.1999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 13,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 13,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 13,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.40000000037252903,
+      "conflicts": 0
+    },
+    {
+      "iter": 14,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 14,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 14,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 14,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 15,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1,
+      "conflicts": 10
+    },
+    {
+      "iter": 15,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 15,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 15,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 16,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 16,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 16,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 16,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.8000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 17,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.1999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 17,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 17,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.7999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 17,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 18,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 18,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 18,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 18,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 19,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.1999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 19,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.2999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 19,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 19,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 0
+    },
+    {
+      "iter": 20,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 20,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 20,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 20,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 21,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 21,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.2000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 21,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 21,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 22,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.2000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 22,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.3000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 22,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 22,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 23,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.2999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 23,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.1999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 23,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 23,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 24,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 24,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 24,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 0
+    },
+    {
+      "iter": 24,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 25,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 25,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 25,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 25,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 26,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 26,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.1999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 26,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 26,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 27,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 27,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 27,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.19999999972060323,
+      "conflicts": 0
+    },
+    {
+      "iter": 27,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 28,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 28,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 28,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 28,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 29,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 29,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.2999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 29,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 29,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 30,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 30,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 30,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 30,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 31,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 31,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 31,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 31,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 32,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 32,
+      "phase": "detect",
+      "page": 2,
+      "ms": 4.199999999720603,
+      "conflicts": 10
+    },
+    {
+      "iter": 32,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 32,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 33,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.1000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 33,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 33,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 1,
+      "conflicts": 0
+    },
+    {
+      "iter": 33,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 34,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 34,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 34,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 34,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 35,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.8000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 35,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 10
+    },
+    {
+      "iter": 35,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 35,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 36,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.099999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 36,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 36,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 36,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 37,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 37,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 37,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 37,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 38,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 38,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 38,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 38,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 39,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 39,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 39,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 39,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.40000000037252903,
+      "conflicts": 0
+    },
+    {
+      "iter": 40,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 10
+    },
+    {
+      "iter": 40,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 40,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.7999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 40,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 41,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.2999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 41,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 41,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 41,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 42,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 42,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 10
+    },
+    {
+      "iter": 42,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 42,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 43,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 43,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 43,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 43,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 44,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.3999999999068677,
+      "conflicts": 10
+    },
+    {
+      "iter": 44,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 10
+    },
+    {
+      "iter": 44,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 44,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 45,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 45,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 45,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 45,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 46,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 46,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 10
+    },
+    {
+      "iter": 46,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 46,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 47,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 47,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 47,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 47,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 48,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 48,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 48,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.599999999627471,
+      "conflicts": 0
+    },
+    {
+      "iter": 48,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 49,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 49,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 49,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 49,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 50,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.3000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 50,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 50,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 50,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 51,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 51,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.3000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 51,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 51,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 52,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1,
+      "conflicts": 10
+    },
+    {
+      "iter": 52,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.2999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 52,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 52,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 53,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 53,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.3000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 53,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 53,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 54,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.3000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 54,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 54,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 54,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 55,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.900000000372529,
+      "conflicts": 10
+    },
+    {
+      "iter": 55,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 55,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 0
+    },
+    {
+      "iter": 55,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 56,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.3000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 56,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 56,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 56,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 57,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 57,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 57,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.40000000037252903,
+      "conflicts": 0
+    },
+    {
+      "iter": 57,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 58,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 58,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 58,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 58,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 59,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 59,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.8999999999068677,
+      "conflicts": 10
+    },
+    {
+      "iter": 59,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 59,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 60,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 60,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 60,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 60,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 61,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 61,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 61,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 1.1000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 61,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 62,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 62,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.1000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 62,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 62,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.40000000037252903,
+      "conflicts": 0
+    },
+    {
+      "iter": 63,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 63,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 63,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 63,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 64,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 64,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 64,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 64,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 65,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1,
+      "conflicts": 10
+    },
+    {
+      "iter": 65,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 65,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 65,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 66,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 66,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 66,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 66,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.40000000037252903,
+      "conflicts": 0
+    },
+    {
+      "iter": 67,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 67,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 67,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 67,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 68,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 68,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 68,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 68,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 69,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 69,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.3000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 69,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 69,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 70,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.3999999999068677,
+      "conflicts": 10
+    },
+    {
+      "iter": 70,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 70,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 70,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 71,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.3000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 71,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 71,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 71,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.599999999627471,
+      "conflicts": 0
+    },
+    {
+      "iter": 72,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 72,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 72,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 4.100000000093132,
+      "conflicts": 0
+    },
+    {
+      "iter": 72,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 1.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 73,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 73,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 73,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 73,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 74,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1,
+      "conflicts": 10
+    },
+    {
+      "iter": 74,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.8000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 74,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 74,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 75,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 75,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 75,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 75,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 0
+    },
+    {
+      "iter": 76,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 76,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 76,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.7999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 76,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 77,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 77,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 77,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 77,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 78,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 78,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 78,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 78,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 79,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 79,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 79,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 79,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.40000000037252903,
+      "conflicts": 0
+    },
+    {
+      "iter": 80,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 80,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 80,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 80,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.40000000037252903,
+      "conflicts": 0
+    },
+    {
+      "iter": 81,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 81,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 81,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 81,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 82,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1,
+      "conflicts": 10
+    },
+    {
+      "iter": 82,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 82,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 82,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 83,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 83,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 10
+    },
+    {
+      "iter": 83,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 83,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 84,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 10
+    },
+    {
+      "iter": 84,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 84,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 0
+    },
+    {
+      "iter": 84,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 85,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.8000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 85,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 85,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 85,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 86,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 86,
+      "phase": "detect",
+      "page": 2,
+      "ms": 7.5,
+      "conflicts": 10
+    },
+    {
+      "iter": 86,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 86,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 87,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.2999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 87,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 87,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 87,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 88,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 88,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 88,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.7999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 88,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.20000000018626451,
+      "conflicts": 0
+    },
+    {
+      "iter": 89,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 89,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.2000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 89,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 89,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.2999999998137355,
+      "conflicts": 0
+    },
+    {
+      "iter": 90,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 90,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 90,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 90,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.3000000002793968,
+      "conflicts": 0
+    },
+    {
+      "iter": 91,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.2000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 91,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.2999999998137355,
+      "conflicts": 10
+    },
+    {
+      "iter": 91,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 91,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 92,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 92,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 92,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 92,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 93,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1,
+      "conflicts": 10
+    },
+    {
+      "iter": 93,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 93,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.40000000037252903,
+      "conflicts": 0
+    },
+    {
+      "iter": 93,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 94,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.599999999627471,
+      "conflicts": 10
+    },
+    {
+      "iter": 94,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.3000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 94,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 94,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.40000000037252903,
+      "conflicts": 0
+    },
+    {
+      "iter": 95,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.1999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 95,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.2000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 95,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 95,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.40000000037252903,
+      "conflicts": 0
+    },
+    {
+      "iter": 96,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.900000000372529,
+      "conflicts": 10
+    },
+    {
+      "iter": 96,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.8000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 96,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 96,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.5,
+      "conflicts": 0
+    },
+    {
+      "iter": 97,
+      "phase": "detect",
+      "page": 1,
+      "ms": 1.2000000001862645,
+      "conflicts": 10
+    },
+    {
+      "iter": 97,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 97,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 97,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.7000000001862645,
+      "conflicts": 0
+    },
+    {
+      "iter": 98,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.6999999997206032,
+      "conflicts": 10
+    },
+    {
+      "iter": 98,
+      "phase": "detect",
+      "page": 2,
+      "ms": 0.6000000000931323,
+      "conflicts": 10
+    },
+    {
+      "iter": 98,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 98,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    },
+    {
+      "iter": 99,
+      "phase": "detect",
+      "page": 1,
+      "ms": 0.8000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 99,
+      "phase": "detect",
+      "page": 2,
+      "ms": 1.3000000002793968,
+      "conflicts": 10
+    },
+    {
+      "iter": 99,
+      "phase": "afterfix",
+      "page": 1,
+      "ms": 0.8999999999068677,
+      "conflicts": 0
+    },
+    {
+      "iter": 99,
+      "phase": "afterfix",
+      "page": 2,
+      "ms": 0.39999999990686774,
+      "conflicts": 0
+    }
+  ]
+}
