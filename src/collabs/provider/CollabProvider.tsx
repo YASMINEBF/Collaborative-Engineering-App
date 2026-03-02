@@ -509,6 +509,28 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
                   }
                 }
 
+                // Handle InvalidFeedCardinality: keep one edge, delete the rest
+                if (action.startsWith("deleteOneEdge:")) {
+                  try {
+                    const keepEdgeId = action.slice("deleteOneEdge:".length);
+                    const meta = c.winningValue?.value as any;
+                    const competingEdges: string[] = meta?.competingEdges ?? (c.losingValues?.value as any) ?? [];
+                    for (const eid of competingEdges) {
+                      if (String(eid) !== keepEdgeId) {
+                        try { deleteRelationship(g, String(eid), { deletedBy: localUserId ?? "user", recordSnapshot: true }); } catch {}
+                      }
+                    }
+                    try {
+                      c.winningValue.value = { keptEdge: keepEdgeId, resolvedBy: localUserId };
+                    } catch {}
+                    // eslint-disable-next-line no-console
+                    console.log(`%c[resolveConflictAction] Kept edge ${keepEdgeId}, deleted others`, "color: green; font-weight: bold");
+                  } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.error("[resolveConflictAction] deleteOneEdge failed:", e);
+                  }
+                }
+
                 // Handle FeedMediumMismatch: deleteFeeds action
                 if (action === "deleteFeeds") {
                   try {

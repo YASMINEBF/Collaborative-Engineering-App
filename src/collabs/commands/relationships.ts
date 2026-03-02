@@ -226,6 +226,8 @@ export function createRelationship(
     const key = makeFeedsKey(sourceId, medium);
     const existing = graph.feedsByPortMedium.get(key);
     if (existing && existing !== id) {
+      // Sequential (local) case: enforce cardinality by keeping the winner and deleting the loser.
+      // The concurrent case (both edges survive after sync) is handled by resolvePortCardinalityConflicts.
       const winner = existing < id ? existing : id;
       const loser = existing < id ? id : existing;
 

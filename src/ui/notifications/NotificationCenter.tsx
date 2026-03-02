@@ -245,6 +245,20 @@ export function NotificationCenter() {
                 conflictId: confId,
                 kind: kind,
               });
+            } else if (kind === ConflictKind.InvalidFeedCardinality) {
+              const meta = conf.winningValue?.value ?? {} as any;
+              const competingEdges: string[] = meta.competingEdges ?? (conf.losingValues?.value as any) ?? [];
+              const portId = meta.portId ?? (meta.key ?? "").split("::")[0];
+              const medium = (meta.key ?? "").split("::")[1] ?? "unknown";
+              notifMap.set(confId, {
+                id: `notif-${confId}`,
+                title: "Port cardinality conflict",
+                message: `Port "${portId}" has ${competingEdges.length} concurrent feeds edges for medium "${medium}" — choose which to keep`,
+                ts: createdAt,
+                conflictId: confId,
+                kind: kind,
+                candidates: competingEdges.map((eid: string) => ({ edgeId: eid })),
+              });
             }
           }
         } catch {}
@@ -457,6 +471,28 @@ export function NotificationCenter() {
               >
                 Delete both
               </button>
+            </div>
+          ) : null}
+          {/* Port Cardinality Conflict - choose which edge to keep */}
+          {it.conflictId && it.kind === String(ConflictKind.InvalidFeedCardinality) && it.candidates && it.candidates.length > 0 ? (
+            <div className="ce-notification-actions ce-attr-conflict-actions">
+              {it.candidates.map((c: any, idx: number) => (
+                <button
+                  key={idx}
+                  className="ce-attr-choice-btn"
+                  onClick={async () => {
+                    try {
+                      const ok = await resolveConflictAction?.(it.conflictId as string, `deleteOneEdge:${c.edgeId}`);
+                      if (!ok) return;
+                      setItems((s) => s.filter((x) => x.id !== it.id));
+                    } catch (e) {
+                      console.warn("resolveConflictAction deleteOneEdge failed:", e);
+                    }
+                  }}
+                >
+                  Keep edge {idx + 1} (delete others)
+                </button>
+              ))}
             </div>
           ) : null}
           {/* Feed Medium Mismatch - two options: delete feeds or revert medium */}

@@ -5,6 +5,7 @@ import resolveFeedMediumConflicts from "./resolveFeedMediumConflicts";
 import resolveHasPartCycles from "./resolveHasPartCycles";
 import resolveValueUnitConflicts from "./resolveValueUnitConflicts";
 import resolveDanglingReferences from "./resolveDanglingReferences";
+import resolvePortCardinalityConflicts from "./resolvePortCardinalityConflicts";
 
 type ResolverOptions = {
   debounceMs?: number;
@@ -55,6 +56,9 @@ export function startConflictResolver(
             } catch (e) {}
             try {
               resolveDanglingReferences(graph as any, currentUserId);
+            } catch (e) {}
+            try {
+              resolvePortCardinalityConflicts(graph as any, currentUserId);
             } catch (e) {}
         } catch (e) {
           // swallow resolver errors
