@@ -1,18 +1,21 @@
 // src/testing/exposeTestApi.ts
 import resolveFeedMediumConflicts from "../collabs/semantics/resolveFeedMediumConflicts";
 import { ConflictKind } from "../collabs/model/enums/ConflictEnum";
-
+import resolveMVRegisterConflicts, { applyMVRegisterResolution }
+  from "../collabs/semantics/resolveMVRegisterConflicts";
+  
 type Setup = {
   graph: any;
   doc: any;
   userId?: string;
+    network?: any; 
 };
 
 function now() {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
 }
 
-export function exposeTestApi({ graph, doc, userId }: Setup) {
+export function exposeTestApi({ graph, doc, userId,network }: Setup) {
   const w = window as any;
   if (w.__CE_TEST_API__?.__isReal === true) return;
 
@@ -85,6 +88,84 @@ export function exposeTestApi({ graph, doc, userId }: Setup) {
       const t1 = now();
       return { ms: t1 - t0 };
     },
+
+    // -------- MV-register resolver timing --------
+runMVRegisterResolverTimed: (asUser?: string) => {
+  const t0 = now();
+  try {
+    resolveMVRegisterConflicts(graph as any, asUser ?? "e2e");
+  } catch {}
+  const t1 = now();
+  return { ms: t1 - t0 };
+},
+
+// Count open ConcurrentAttributeEdit conflicts
+getConcurrentAttributeEditCount: () => {
+  let c = 0;
+  try {
+    for (const [, conf] of graph.conflicts.entries()) {
+      try {
+        const kind = conf.kind?.value ?? conf.kind;
+        const status = conf.status?.value ?? "open";
+        if (status !== "open") continue;
+        if (kind === ConflictKind.ConcurrentAttributeEdit) c++;
+      } catch {}
+    }
+  } catch {}
+  return c;
+},
+
+// Set an MV attribute value
+setAttrMV: (compId: string, key: string, value: any) => {
+  try {
+    const c: any = graph.components.get(String(compId));
+    if (!c?.attrs?.set) return false;
+    c.attrs.set(String(key), value);
+    return true;
+  } catch {
+    return false;
+  }
+},
+
+// Get concurrent candidates of MV attribute
+getAttrConflictsMV: (compId: string, key: string) => {
+  try {
+    const c: any = graph.components.get(String(compId));
+    if (!c?.attrs?.getConflicts) return [];
+    const res = c.attrs.getConflicts(String(key));
+    return Array.isArray(res) ? res : res ? Array.from(res) : [];
+  } catch {
+    return [];
+  }
+},
+
+// Get effective value (after resolution)
+getAttrMV: (compId: string, key: string) => {
+  try {
+    const c: any = graph.components.get(String(compId));
+    if (!c?.attrs) return null;
+    if (typeof c.attrs.get === "function") return c.attrs.get(String(key));
+    const cs = c.attrs.getConflicts?.(String(key));
+    if (Array.isArray(cs) && cs.length === 1) return cs[0];
+    return null;
+  } catch {
+    return null;
+  }
+},
+
+// Apply resolution (user picks one candidate)
+applyMVResolution: (compId: string, chosenValue: any, asUser?: string) => {
+  try {
+    return !!applyMVRegisterResolution(
+      graph as any,
+      String(compId),
+      chosenValue,
+      asUser ?? "e2e"
+    );
+  } catch {
+    return false;
+  }
+},
 
     // Count ALL feed-medium mismatches (global)
     getFeedMediumMismatchCount: () => {
@@ -260,6 +341,23 @@ export function exposeTestApi({ graph, doc, userId }: Setup) {
             if (comp && (comp as any).outputMedium) (comp as any).outputMedium.value = medium;
           } catch {}
         }
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    disconnect: () => {
+      try {
+        network?.disconnect?.();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    reconnect: () => {
+      try {
+        network?.connect?.();
         return true;
       } catch {
         return false;

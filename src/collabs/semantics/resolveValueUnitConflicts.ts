@@ -59,20 +59,27 @@ function ensureSemanticConflict(
     }
   }
 }
-
-function clearSemanticConflict(graph: CEngineeringGraph, compId: string, keyHint: string) {
+//change this to resolve and not clear / delete 
+function clearSemanticConflict(graph: CEngineeringGraph, compId: string, keyHint: string, currentUserId="system") {
   try {
-    const toDelete: string[] = [];
-    for (const [cid, conf] of graph.conflicts.entries()) {
+    for (const [, conf] of graph.conflicts.entries()) {
       if (conf.kind?.value !== ConflictKind.SemanticallyRelatedAttributes) continue;
+
       const refs = conf.entityRefs?.values ? Array.from(conf.entityRefs.values()) : [];
       if (!refs.includes(String(compId))) continue;
       if (semanticKeyOf(conf) !== keyHint) continue;
-      toDelete.push(String(cid));
+
+      if (conf.status.value !== "resolved") {
+        conf.status.value = "resolved";
+        conf.resolution.value = "auto";
+        conf.resolvedBy.value = currentUserId;
+        conf.resolvedAt.value = Date.now();
+      }
+      // optional: conf.losingValues.value = [];
     }
-    for (const d of toDelete) graph.conflicts.delete(d as any);
   } catch {}
 }
+
 
 function needsConflict(candidates: any[], differs: (a: any, b: any) => boolean) {
   if (!Array.isArray(candidates) || candidates.length <= 1) return false;

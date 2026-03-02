@@ -33,7 +33,7 @@ function clearDanglingConflicts(graph: any) {
   const toDelete: string[] = [];
   for (const [id, conf] of graph.conflicts.entries()) {
     const kind = conf.kind?.value ?? conf.kind;
-    if (kind === ConflictKind.DanglingReference || String(kind) === String(ConflictKind.DanglingReference)) {
+    if (String(kind) === String(ConflictKind.DanglingReference)) {
       toDelete.push(String(id));
     }
   }
@@ -45,52 +45,185 @@ function countOpenDangling(graph: any) {
   for (const [, conf] of graph.conflicts.entries()) {
     const kind = conf.kind?.value ?? conf.kind;
     const status = conf.status?.value ?? "open";
-    if (
-      (kind === ConflictKind.DanglingReference || String(kind) === String(ConflictKind.DanglingReference)) &&
-      status === "open"
-    ) {
-      c++;
-    }
+    if (String(kind) === String(ConflictKind.DanglingReference) && status === "open") c++;
   }
   return c;
 }
 
 /**
- * Build a fixed graph once:
- * - CORE nodes that we never delete (to keep scan cost stable)
- * - CANDIDATE nodes that each appear in exactly ONE relationship
- *   so deleting them creates exactly one dangling reference each.
+ * Robust "record deletion" helper for benchmarking.
+ *
+ * Your resolver only flags missing nodes if graph.deletionLog.get(nodeId) exists.
+ * But deletionLog may be a CValueMap with constructor-like set() signatures.
+ *
+ * This function tries multiple ways to create the entry, then fills fields if present.
  */
-function buildFixedGraph(graph: any, coreN: number, candN: number, coreEdgesPerNode: number) {
-  // core components c0..c{coreN-1}
-  for (let i = 0; i < coreN; i++) {
-    const id = `core${i}`;
-    graph.components.set(id, "equipment", id);
+function recordDeletion(graph: any, id: string) {
+  const dl = graph?.deletionLog;
+  if (!dl || typeof dl.get !== "function" || typeof dl.set !== "function") {
+    throw new Error(
+      "graph.deletionLog is missing or does not support .get/.set. " +
+        "This benchmark depends on deletionLog because resolveDanglingReferences checks it."
+    );
   }
 
-  // candidate components d0..d{candN-1}
-  for (let i = 0; i < candN; i++) {
-    const id = `dang${i}`;
-    graph.components.set(id, "equipment", id);
+  const key = String(id);
+  const deletedAt = Date.now();
+
+  // 1) Ensure an entry exists (try different set signatures)
+  //    - dl.set(key, object)
+  //    - dl.set(key) then fill fields
+  //    - dl.set(key, type, uniqueName) (common pattern)
+  let entry: any = null;
+
+  // If already exists, reuse it
+  try {
+    entry = dl.get(key);
+  } catch {}
+
+  if (!entry) {
+    // Try: dl.set(key, {...})
+    try {
+      dl.set(key, {
+        type: "equipment",
+        uniqueName: key,
+        position: { x: 0, y: 0 },
+        deletedAt,
+        deletedBy: "bench",
+      });
+    } catch {}
+
+    try {
+      entry = dl.get(key);
+    } catch {}
+
+    // Try: dl.set(key)  (constructor with no args)
+    if (!entry) {
+      try {
+        dl.set(key);
+      } catch {}
+      try {
+        entry = dl.get(key);
+      } catch {}
+    }
+
+    // Try: dl.set(key, type, uniqueName)
+    if (!entry) {
+      try {
+        dl.set(key, "equipment", key);
+      } catch {}
+      try {
+        entry = dl.get(key);
+      } catch {}
+    }
   }
+
+  // 2) Fill fields if the entry is a Collabs object (common: fields are CVars)
+  if (entry && typeof entry === "object") {
+    try {
+      if (entry.type && "value" in entry.type) entry.type.value = "equipment";
+    } catch {}
+    try {
+      if (entry.uniqueName && "value" in entry.uniqueName) entry.uniqueName.value = key;
+    } catch {}
+    try {
+      if (entry.position && "value" in entry.position) entry.position.value = { x: 0, y: 0 };
+    } catch {}
+    try {
+      if (entry.deletedAt && "value" in entry.deletedAt) entry.deletedAt.value = deletedAt;
+    } catch {}
+    try {
+      if (entry.deletedBy && "value" in entry.deletedBy) entry.deletedBy.value = "bench";
+    } catch {}
+  }
+
+  // 3) Final sanity check: resolver will call dl.get(key)
+  //    If still empty, throw early so you know why open1 stays 0.
+  try {
+    const check = dl.get(key);
+    if (!check) {
+      throw new Error(`recordDeletion: deletionLog.get(${key}) is still null after attempting to set it.`);
+    }
+  } catch (e: any) {
+    throw new Error(`recordDeletion failed for ${key}: ${String(e?.message ?? e)}`);
+  }
+}
+
+/**
+ * Benchmark wrapper:
+ * - Run real resolver
+ * - Then cleanup dangling conflicts that are no longer dangling (node restored OR edge gone),
+ *   so "afterFix" can be measured meaningfully.
+ */
+function resolveDanglingBench(graph: any, user = "bench") {
+  resolveDanglingReferences(graph, user);
+
+  const toDelete: string[] = [];
+  try {
+    for (const [confId, conf] of graph.conflicts.entries()) {
+      const kind = conf.kind?.value ?? conf.kind;
+      if (String(kind) !== String(ConflictKind.DanglingReference)) continue;
+
+      const idStr = String(confId);
+      // your resolver uses: `dangling::node::<nodeId>::edge::<edgeId>`
+      const m = idStr.match(/^dangling::node::(.+?)::edge::(.+)$/);
+      if (!m) continue;
+      const nodeId = m[1];
+      const edgeId = m[2];
+
+      const nodeExists = !!graph.components.get(String(nodeId));
+      const edgeExists = !!graph.relationships.get(String(edgeId));
+
+      if (nodeExists || !edgeExists) toDelete.push(idStr);
+    }
+  } catch {}
+
+  for (const id of toDelete) {
+    try {
+      graph.conflicts.delete(id);
+    } catch {}
+  }
+}
+
+/**
+ * Build a fixed graph once:
+ * - CORE nodes never deleted
+ * - CANDIDATE nodes each appear in exactly ONE relationship: core0 -> dang{i}
+ */
+function buildFixedGraph(graph: any, coreN: number, candN: number, coreEdgesPerNode: number) {
+  for (let i = 0; i < coreN; i++) graph.components.set(`core${i}`, "equipment", `core${i}`);
+  for (let i = 0; i < candN; i++) graph.components.set(`dang${i}`, "equipment", `dang${i}`);
 
   let edgeId = 0;
 
-  // lots of edges among core nodes (stable scan cost, never dangling)
   for (let i = 0; i < coreN; i++) {
     for (let k = 0; k < coreEdgesPerNode; k++) {
       const j = (i * 131 + k * 17 + 7) % coreN;
       if (j === i) continue;
-      const id = `e${edgeId++}`;
-      graph.relationships.set(id, "physical", PhysicalKind.Feeds, `core${i}`, `core${j}`, null, null, null);
+      graph.relationships.set(
+        `e${edgeId++}`,
+        "physical",
+        PhysicalKind.Feeds,
+        `core${i}`,
+        `core${j}`,
+        null,
+        null,
+        null
+      );
     }
   }
 
-  // ONE edge per candidate node: core0 -> dang{i}
-  // Each candidate appears only here, so deleting it creates exactly 1 dangling conflict.
   for (let i = 0; i < candN; i++) {
-    const id = `dedge${i}`;
-    graph.relationships.set(id, "physical", PhysicalKind.Feeds, "core0", `dang${i}`, null, null, null);
+    graph.relationships.set(
+      `dedge${i}`,
+      "physical",
+      PhysicalKind.Feeds,
+      "core0",
+      `dang${i}`,
+      null,
+      null,
+      null
+    );
     edgeId++;
   }
 
@@ -101,8 +234,8 @@ test("HEADLESS multiconflict scaling: DanglingReference vs #dangling conflicts (
   test.setTimeout(10 * 60_000);
 
   const coreN = 1000;
-  const candN = 300; // must be >= max(C) in sweep
-  const coreEdgesPerNode = 8; // ~8000 + 300 candidate edges
+  const candN = 300;
+  const coreEdgesPerNode = 8;
   const conflictsSweep = [1, 5, 10, 25, 50, 100, 200];
 
   const WARMUP = 5;
@@ -116,8 +249,6 @@ test("HEADLESS multiconflict scaling: DanglingReference vs #dangling conflicts (
   const series: any[] = [];
 
   for (const C of conflictsSweep) {
-    if (C > candN) throw new Error(`C=${C} exceeds candN=${candN}. Increase candN.`);
-
     const baselineSamples: number[] = [];
     const detectSamples: number[] = [];
     const afterFixSamples: number[] = [];
@@ -127,36 +258,37 @@ test("HEADLESS multiconflict scaling: DanglingReference vs #dangling conflicts (
     for (let t = 0; t < totalRuns; t++) {
       clearDanglingConflicts(graph as any);
 
-      // Ensure all candidate components exist before baseline
+      // Ensure candidates exist (baseline should be no dangling)
       for (let i = 0; i < C; i++) {
         const id = `dang${i}`;
-        if (!graph.components.get(id)) {
-          graph.components.set(id, "equipment", id);
-        }
+        if (!graph.components.get(id)) graph.components.set(id, "equipment", id);
       }
 
-      // Baseline (no dangling)
+      // Baseline
       let t0 = nowMs();
-      resolveDanglingReferences(graph as any, "bench");
+      resolveDanglingBench(graph as any, "bench");
       let t1 = nowMs();
       const baseMs = t1 - t0;
 
-      // Inject dangling refs by deleting first C candidate components
+      // Delete first C candidates (but do it in a way resolver recognizes)
       for (let i = 0; i < C; i++) {
         const id = `dang${i}`;
-        if (graph.components.get(id)) graph.components.delete(id);
+        if (graph.components.get(id)) {
+          recordDeletion(graph as any, id); // key for detection
+          graph.components.delete(id);
+        }
       }
 
       // Detect
       t0 = nowMs();
-      resolveDanglingReferences(graph as any, "bench");
+      resolveDanglingBench(graph as any, "bench");
       t1 = nowMs();
       const detMs = t1 - t0;
 
       const open1 = countOpenDangling(graph as any);
       expect(open1).toBeGreaterThanOrEqual(C);
 
-      // Fix: recreate the deleted components
+      // Restore
       for (let i = 0; i < C; i++) {
         const id = `dang${i}`;
         if (!graph.components.get(id)) graph.components.set(id, "equipment", id);
@@ -164,7 +296,7 @@ test("HEADLESS multiconflict scaling: DanglingReference vs #dangling conflicts (
 
       // After-fix
       t0 = nowMs();
-      resolveDanglingReferences(graph as any, "bench");
+      resolveDanglingBench(graph as any, "bench");
       t1 = nowMs();
       const fixMs = t1 - t0;
 
@@ -176,8 +308,6 @@ test("HEADLESS multiconflict scaling: DanglingReference vs #dangling conflicts (
         detectSamples.push(detMs);
         afterFixSamples.push(fixMs);
       }
-
-      if ((t + 1) % 10 === 0) console.log(`C=${C}: ${t + 1}/${totalRuns}`);
     }
 
     series.push({
@@ -187,13 +317,11 @@ test("HEADLESS multiconflict scaling: DanglingReference vs #dangling conflicts (
       detect: summarize(detectSamples),
       afterFix: summarize(afterFixSamples),
     });
-
-    console.log(`done C=${C}`);
   }
 
   const out = {
     invariant: "DanglingReference",
-    resolver: "resolveDanglingReferences",
+    resolver: "resolveDanglingReferences (+bench cleanup)",
     mode: "headless_multiconflict_scaling_fixed_graph",
     timestamp: new Date().toISOString(),
     fixed: { coreN, candN, coreEdgesPerNode, edgesApprox },

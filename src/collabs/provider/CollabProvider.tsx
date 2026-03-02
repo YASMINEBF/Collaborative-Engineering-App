@@ -671,7 +671,7 @@ export const CollabProvider: React.FC<{ children?: React.ReactNode }> = ({ child
     if (state.status !== "ready" || !state.graph || !state.doc) return;
 
     try {
-      exposeTestApi({ graph: state.graph, doc: state.doc, userId: state.userId });
+      exposeTestApi({ graph: state.graph, doc: state.doc, userId: state.userId, network: (state.provider as any)?.network });
     } catch (e) {
       console.warn("CollabProvider: exposeTestApi failed:", e);
     }
